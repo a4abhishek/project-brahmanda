@@ -12,23 +12,23 @@ Context: \[What is the issue that we are seeing? What is the decision we need to
 
 ### **1\. \[Reason One\]**
 
-* \[Explanation\]
-* \[Why this fits Project Brahmanda\]
+- \[Explanation\]
+- \[Why this fits Project Brahmanda\]
 
 ### **2\. \[Reason Two\]**
 
-* \[Explanation\]
+- \[Explanation\]
 
 ## **Consequences**
 
-* **Positive:**
-  * \[Benefit 1\]
-  * \[Benefit 2\]
-* **Negative:**
-  * \[Drawback 1\]
-  * \[Drawback 2\]
+- **Positive:**
+  - \[Benefit 1\]
+  - \[Benefit 2\]
+- **Negative:**
+  - \[Drawback 1\]
+  - \[Drawback 2\]
 
 ## **Compliance**
 
-* **Vastu:** Does this adhere to the "Asanga Shastra" (detachability) principle?
-* **Security:** Does this maintain the isolation of the Vyom cluster?
+- **Vastu:** Does this adhere to the "Asanga Shastra" (detachability) principle?
+- **Security:** Does this maintain the isolation of the Vyom cluster?

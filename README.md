@@ -1,5 +1,12 @@
 <img src=".github/assets/cover.png" alt="Project Brahmanda Cover">
 
+<p align="center">
+न रूपमस्येह तथोपलभ्यते, नान्तो न चादिर्न च सम्प्रतिष्ठा | <br>
+अश्वत्थमेनं सुविरूढमूल, मसङ्गशस्त्रेण दृढेन छित्त्वा ||
+
+"The real form of this tree (of Brahmanda) is not perceived in this world... Having cut down this firmly rooted tree with the strong weapon of detachment..." (Bhagavad Gita 15.3)
+</p>
+
 # **Project Brahmanda (Project Universe)**
 
 **"Traffic enters through the Kshitiz gateway, is processed by the Vyom cluster, and maintained by the Samsara pipelines."**
@@ -19,37 +26,50 @@ The universe is divided into three planes of existence:
 ## **📂 The Vastu (Directory Structure)**
 
 This repository serves as the **Platform Monorepo**.
-
+```sh
 brahmanda-infra/
-├── Makefile                  \# 🕹️ The Control Plane (Srishti/Pralaya)
-├── .github/                  \# CI Pipelines (GitHub Actions)
+├── .github/                  # CI Pipelines (GitHub Actions)
 │
-├── vastu/                    \# 🏛️ Architecture & Blueprints
-│   ├── vidhana/              \# ADRs (Constitutional Decisions)
-│   │   ├── 001-architecture.md
-│   │   └── 002-storage-strategy.md
-│   └── templates/            \# Documentation Templates
+├── Vaastu/                   # 🏛️ Architecture & Blueprints
+│   ├── 00_Brahmanda-Siddhanta.md # The guiding principles and philosophy
+│   ├── 01_Pratistha.md           # The setup guide
+│   ├── 02_Rachana.md             # The architecture
+│   ├── Manthana/                 # 💬 Detailed Rationale (The Churning)
+│   │   ├── README.md             # Explains Manthana's purpose
+│   │   ├── 001-Homelab-Architecture.md
+│   │   ├── 002-Storage-Strategy.md
+│   │   └── 003-Secret-Management.md
+│   ├── Vidhana/                  # 📜 ADRs (Constitutional Decisions)
+│   │   ├── README.md             # Explains Vidhana's purpose
+│   │   ├── ADR-XXX-ADR-Template.md
+│   │   ├── ADR-001-Homelab-Architecture.md
+│   │   ├── ADR-002-Storage-Strategy.md
+│   │   └── ADR-003-Secret-Management.md
+│   └── Vivechana/                # 🔍 RCAs (Critical Examination)
+│       └── README.md             # Explains Vivechana's purpose
 │
-├── samsara/                  \# ♾️ Automation (The Cycle)
-│   ├── terraform/            \# Provisioning (Infrastructure as Code)
-│   │   ├── kshitiz/          \# Edge Layer (AWS Lightsail)
-│   │   └── vyom/             \# Compute Layer (Proxmox VMs)
+├── samsara/                  # ♾️ Automation (The Cycle)
+│   ├── terraform/            # Provisioning (Infrastructure as Code)
+│   │   ├── kshitiz/          # Edge Layer (AWS Lightsail)
+│   │   └── vyom/             # Compute Layer (Proxmox VMs)
 │   │
-│   └── ansible/              \# Configuration Management
-│       ├── inventory/        \# Hosts and IPs
-│       ├── group\_vars/       \# Variables & Encrypted Secrets
-│       │   ├── brahmanda/    \# Global variables
-│       │   ├── kshitiz/      \# Edge specific
-│       │   └── vyom/         \# Compute specific
-│       ├── roles/            \# Reusable logic (Nebula, K3s, Hardening)
-│       └── playbooks/        \# Execution scripts
+│   └── ansible/              # Configuration Management
+│       ├── inventory/        # Hosts and IPs
+│       ├── group_vars/       # Variables & Encrypted Secrets
+│       │   ├── brahmanda/    # Global variables
+│       │   ├── kshitiz/      # Edge specific
+│       │   └── vyom/         # Compute specific
+│       ├── roles/            # Reusable logic (Nebula, K3s, Hardening)
+│       └── playbooks/        # Execution scripts
 │
-├── sankalpa/                 \# ☸️ Desired State (GitOps/ArgoCD)
-│   ├── core/                 \# System Apps (Longhorn, Ingress, Cert-Manager)
-│   ├── observability/        \# Prometheus, Grafana, Loki
-│   └── apps/                 \# Custom Applications (Greeter AI, Go Services)
+├── sankalpa/                 # ☸️ Desired State (GitOps/ArgoCD)
+│   ├── core/                 # System Apps (Longhorn, Ingress, Cert-Manager)
+│   ├── observability/        # Prometheus, Grafana, Loki
+│   └── apps/                 # Custom Applications (Greeter AI, Go Services)
 │
-└── scripts/                  \# 🛠️ Utilities (Disaster Recovery, ISO Gen)
+├── scripts/                  # 🛠️ Utilities (Disaster Recovery, ISO Gen)(Srishti/Pralaya)
+└── Makefile                  # 🕹️ The Control Plane 
+```
 
 ## **🚀 Getting Started**
 
@@ -84,4 +104,4 @@ We use a **Makefile** to invoke the creation and destruction of the Brahmanda. E
 * **ADR-002:** Storage Strategy (Longhorn over Ceph).
 * **ADR-003:** Hybrid Secret Management (Ansible Vault \+ 1Password).
 
-*"Having cut down this firmly rooted tree with the strong weapon of detachment..."* — **Gita 15.3**
+*"Having cut down this firmly rooted tree (of Brahmanda) with the strong weapon of detachment..."* — **Gita 15.3**
