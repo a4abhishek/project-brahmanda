@@ -1,75 +1,172 @@
-# **ADR 003: Hybrid Secret Management Strategy (Project Samsara)**
+# **ADR-003: Hybrid Secret Management Strategy**
 
-Project Brahmanda requires the management of highly sensitive credentials (Nebula CA keys, SSH private keys, Cloud API tokens). Since the infrastructure spans multiple environments (MacBook, Windows/WSL, CI/CD pipelines) and manages the network layer itself, relying solely on an online-only secret manager creates a "Connectivity Paradox" (you cannot fetch the keys to fix the network if the network is down).
+Date: 2025-12-31
+Status: Accepted
+
+## **Context**
+
+Project Brahmanda requires the management of highly sensitive credentials (Nebula CA keys, SSH private keys, Cloud API tokens). Since the infrastructure spans multiple environments (MacBook, Windows/WSL, CI/CD pipelines) and manages the network layer itself, relying solely on an online-only secret manager creates a "Connectivity Paradox".
+
+For a detailed discussion and rationale, please see [manthana/RFC-003-Secret-Management.md](../manthana/RFC-003-Secret-Management.md).
 
 ## **Decision**
 
 We will adopt a **Hybrid Secret Management** model combining **Ansible Vault** and **1Password**.
 
-1. **Storage (The Vault):**
-   * All sensitive infrastructure secrets (e.g., ca.key, id\_rsa) will be stored **encrypted at rest** within the Git repository using **Ansible Vault**.
-   * We will use a **"Scoped Files, Single Key"** strategy. Secrets are split into separate files based on their domain (Global vs. Edge vs. Compute), but they are all encrypted with the same master password.
-   * This ensures "Infrastructure as Code" integrity: rolling back a commit also rolls back the secrets associated with it.
-2. **Access Control (The Key):**
-   * The **Ansible Vault Password** itself will be stored securely in **1Password**.
-   * It will **never** be written to disk in plain text.
+### **1. The Storage Layer (Ansible Vault)**
 
-## **Detailed Rationale**
+- All infrastructure secrets (SSH keys, API tokens, Certificates) **MUST** be stored encrypted at rest within the Git repository using **Ansible Vault**.
+- Secrets **MUST** be scoped by domain using the "Scoped Files, Single Key" pattern:
+  - `group_vars/brahmanda/vault.yml`: Global secrets (Nebula CA).
+  - `group_vars/kshitiz/vault.yml`: Edge secrets.
+  - `group_vars/vyom/vault.yml`: Compute secrets.
 
-### **1\. The Connectivity Paradox (Resilience)**
+### **2. The Access Layer (1Password)**
 
-* **Problem:** If we relied purely on fetching secrets from 1Password via API (op run) during runtime, a Lighthouse failure or home internet outage would prevent us from running the Ansible playbooks needed to fix the outage.
-* **Solution:** By storing the encrypted secrets locally in the git repo, we only need the *Vault Password* to decrypt them. This password can be manually retrieved from the 1Password mobile app on a phone if the laptop has no internet, allowing for offline infrastructure repair.
+- The **Ansible Vault Password** and cloud provider root credentials **MUST** be stored in a dedicated 1Password Vault named **"Project-Brahmanda"**.
+- They **MUST NOT** be stored in the user's "Private" vault to ensure isolation and least-privilege access for Service Accounts.
+- The Vault Password **MUST NEVER** be committed to Git in plain text.
 
-### **2\. Cross-Platform Compatibility**
+## **Implementation**
 
-* The user operates on both **macOS** (Work) and **Windows/WSL** (Home).
-* Ansible Vault files are just text files in Git; they sync seamlessly.
-* 1Password handles the secure synchronization of the Vault Password across devices.
+### **1. Secret Distribution Strategy**
 
-### **3\. CI/CD Integration**
+Secrets are distributed across three layers for security and operational efficiency:
 
-* In automated pipelines (GitHub Actions), we do not need to expose the entire 1Password vault. We only need to inject the **Vault Password** as a GitHub Repository Secret. Ansible handles the rest locally within the runner.
+**1Password Vault (Project-Brahmanda):**
+- AWS Access Key ID and Secret Access Key
+- Cloudflare API Token
+- Ansible Vault Password (the master key to decrypt all Ansible Vaults)
 
-## **Implementation Plan**
+**Ansible Vault (Encrypted in Git):**
+- Nebula CA private key (`ca.key`)
+- SSH private keys for nodes
+- K3s cluster tokens
+- Longhorn R2 credentials (access-key-id, secret-access-key, endpoint)
 
-### **1\. Directory Structure (Scoped Vaults)**
+**GitHub Secrets:**
+- `OP_SERVICE_ACCOUNT_TOKEN` (the **only** secret stored here)
 
+### **2. Secret Flow Architecture**
+
+```text
+GitHub Actions
+    ↓ (uses OP_SERVICE_ACCOUNT_TOKEN)
+1Password (Project-Brahmanda Vault)
+    ↓ (fetches AWS, Cloudflare, Ansible Vault Password)
+Terraform & Ansible
+    ↓ (uses Ansible Vault Password to decrypt)
+Ansible Vault Files
+    ↓ (provides infrastructure secrets)
+Provisioning
+```
+
+### **3. Directory Structure**
+
+```text
 samsara/
 ├── ansible/
-│   ├── group\_vars/
-│   │   ├── brahmanda/     \# Universal/Global Secrets (Nebula CA Key, Admin Passwords)
+│   ├── group_vars/
+│   │   ├── brahmanda/    # Global Secrets (Nebula CA, Admin Passwords)
 │   │   │   ├── vault.yml
 │   │   │   └── vars.yml
-│   │   ├── kshitiz/       \# Edge Layer Secrets (Lighthouse)
-│   │   │   └── vault.yml      \# (e.g., Specific SSH Host Keys for Lightsail)
-│   │   └── vyom/          \# Compute Layer Secrets (K8s Nodes/NUC)
-│   │       └── vault.yml      \# (e.g., K3s Tokens, Longhorn S3 Keys)
+│   │   ├── kshitiz/      # Edge Layer Secrets (Lighthouse)
+│   │   │   └── vault.yml
+│   │   └── vyom/         # Compute Layer Secrets (K3s Tokens, Longhorn)
+│   │       └── vault.yml
+```
 
-### **2\. Workflow (Local Development)**
+### **4. 1Password Setup**
 
-* **Setup:** The SRE retrieves the Vault Password from 1Password once per session.
-* **Execution:**
-  \# Option A: Manual Entry (Offline mode)
-  ansible-playbook setup.yml \--ask-vault-pass
+Create the following items in the **"Project-Brahmanda"** vault:
 
-  \# Option B: Automated (Online mode using 1Password CLI)
-  \# The script fetches the password from 1Password and passes it to Ansible
-  ansible-playbook setup.yml \--vault-password-file \<(op read "op://Private/Ansible Vault/password")
+1. **AWS Credentials:**
+   - Type: Login or API Credential
+   - Item Name: `AWS-samsara-iac`
+   - Fields:
+     - `Security Credentials/AWS_ACCESS_KEY_ID`
+     - `Security Credentials/AWS_ACCESS_KEY_SECRET`
 
-### **3\. Workflow (CI/CD)**
+2. **Cloudflare API Token:**
+   - Type: API Credential
+   - Item Name: `Cloudflare`
+   - Field: `api-token`
 
-* Store the Vault Password in GitHub Secrets as ANSIBLE\_VAULT\_PASSWORD.
-* Pipeline Step:
-  \- name: Run Playbook
-    run: |
-      echo "$ANSIBLE\_VAULT\_PASSWORD" \> .vault\_pass
-      ansible-playbook site.yml \--vault-password-file .vault\_pass
-      rm .vault\_pass
-    env:
-      ANSIBLE\_VAULT\_PASSWORD: ${{ secrets.ANSIBLE\_VAULT\_PASSWORD }}
+3. **Ansible Vault Password:**
+   - Type: Password
+   - Item Name: `Ansible Vault - Samsara`
+   - Field: `password`
+
+4. **1Password Service Account:**
+   - Create a Service Account with access **scoped only** to the "Project-Brahmanda" vault.
+   - Copy the `OP_SERVICE_ACCOUNT_TOKEN` and store it in GitHub Repository Secrets.
+
+### **5. Vault Management Commands**
+
+Use the provided Makefile targets to manage Ansible Vault files:
+
+- **Encrypt (Gopana):** Encrypt the vault file after editing.
+  ```bash
+  make gopana
+  ```
+
+- **Decrypt (Prakasha):** Decrypt the vault file for viewing (use sparingly).
+  ```bash
+  make prakasha
+  ```
+
+- **Edit (Samshodhana):** Securely edit the vault file (decrypts in-memory, re-encrypts on save).
+  ```bash
+  make samshodhana
+  ```
+
+All commands automatically fetch the Ansible Vault Password from 1Password using:
+```bash
+op read "op://Project-Brahmanda/Ansible Vault - Samsara/password"
+```
+
+### **6. Local Development Workflow**
+
+**Option A: Manual Entry (Offline Mode)**
+```bash
+ansible-playbook setup.yml --ask-vault-pass
+```
+
+**Option B: Automated (Online Mode using 1Password CLI)**
+```bash
+ansible-playbook setup.yml --vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password")
+```
+
+### **7. GitHub Actions Configuration**
+
+**Step 1: Store the Service Account Token**
+- Add `OP_SERVICE_ACCOUNT_TOKEN` to GitHub Repository Secrets.
+
+**Step 2: Configure Workflow**
+
+```yaml
+- name: Load secrets from 1Password
+  uses: 1password/load-secrets-action@v1
+  env:
+    OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+  with:
+    export-env: false
+    export: |
+      AWS_ACCESS_KEY_ID=op://Project-Brahmanda/AWS-samsara-iac/Security Credentials/AWS_ACCESS_KEY_ID
+      AWS_SECRET_ACCESS_KEY=op://Project-Brahmanda/AWS-samsara-iac/Security Credentials/AWS_ACCESS_KEY_SECRET
+      CLOUDFLARE_API_TOKEN=op://Project-Brahmanda/Cloudflare/api-token
+      ANSIBLE_VAULT_PASSWORD=op://Project-Brahmanda/Ansible Vault - Samsara/password
+
+- name: Run Ansible Playbook
+  run: |
+    echo "$ANSIBLE_VAULT_PASSWORD" > .vault_pass
+    ansible-playbook site.yml --vault-password-file .vault_pass
+    rm .vault_pass
+  env:
+    ANSIBLE_VAULT_PASSWORD: ${{ env.ANSIBLE_VAULT_PASSWORD }}
+```
 
 ## **Consequences**
 
-* **Positive:** Full offline recovery capability. Secrets are version-controlled with code. Zero-trust regarding where the code is stored (repo can be public, secrets remain encrypted).
-* **Negative:** High friction if the Vault Password is lost (data is unrecoverable). Binary blobs in git history if vault files change frequently (mitigated by keeping vault files small and specific).
+- **Positive:** Full offline recovery capability. Secrets are version-controlled with code. Zero-trust regarding where the code is stored.
+- **Negative:** High friction if the Vault Password is lost.

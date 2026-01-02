@@ -1,5 +1,12 @@
 <img src=".github/assets/cover.png" alt="Project Brahmanda Cover">
 
+<p align="center">
+न रूपमस्येह तथोपलभ्यते, नान्तो न चादिर्न च सम्प्रतिष्ठा | <br>
+अश्वत्थमेनं सुविरूढमूल, मसङ्गशस्त्रेण दृढेन छित्त्वा ||
+
+"The real form of this tree (of Brahmanda) is not perceived in this world... Having cut down this firmly rooted tree with the strong weapon of detachment..." (Bhagavad Gita 15.3)
+</p>
+
 # **Project Brahmanda (Project Universe)**
 
 **"Traffic enters through the Kshitiz gateway, is processed by the Vyom cluster, and maintained by the Samsara pipelines."**
@@ -8,7 +15,7 @@
 
 **Project Brahmanda** is a Homelab experiment designed to simulate a production-grade, hybrid-cloud microservices environment. It adheres to the **"Asanga Shastra"** (Weapon of Detachment)—the principle that infrastructure is transient (*Naswar*) and should be capable of being destroyed and recreated at will via code.
 
-### **The Architecture**
+### **🏛️ The Architecture**
 
 The universe is divided into three planes of existence:
 
@@ -16,42 +23,51 @@ The universe is divided into three planes of existence:
 2. **Vyom (The Cluster):** The compute core. An ASUS NUC 14 Pro Plus (96GB RAM) running Proxmox and Kubernetes (K3s), where the applications live.
 3. **Samsara (The Cycle):** The automation layer. Terraform and Ansible pipelines that govern the creation, configuration, and destruction of the universe.
 
-## **📂 The Vastu (Directory Structure)**
+## **📂 The Directory Structure**
 
 This repository serves as the **Platform Monorepo**.
-
+```sh
 brahmanda-infra/
-├── Makefile                  \# 🕹️ The Control Plane (Srishti/Pralaya)
-├── .github/                  \# CI Pipelines (GitHub Actions)
+├── .github/                  # CI Pipelines (GitHub Actions)
 │
-├── vastu/                    \# 🏛️ Architecture & Blueprints
-│   ├── vidhana/              \# ADRs (Constitutional Decisions)
-│   │   ├── 001-architecture.md
-│   │   └── 002-storage-strategy.md
-│   └── templates/            \# Documentation Templates
+├── vaastu/                   # 🏛️ Architecture & Blueprints
+│   ├── 00_Brahmanda-Siddhanta.md # The guiding principles and philosophy
+│   ├── 001-Sarga.md              # The primary creation (setup)
+│   ├── 002-Visarga.md            # The secondary creation (architecture)
+│   ├── manthana/                 # 💬 Detailed Rationale (The Churning)
+│   │   ├── README.md             # Explains manthana's purpose
+│   │   └── RFC-XXX...            # Request for Comments (Proposals)
+│   ├── vidhana/                  # 📜 The Rules & Decisions (Constitutional Law)
+│   │   ├── README.md             # Explains vidhana's purpose
+│   │   └── ADR-XXX...            # Architecture Decision Records
+│   └── vivechana/                # 🔍 RCAs (Critical Examination)
+│       └── README.md             # Explains vivechana's purpose
 │
-├── samsara/                  \# ♾️ Automation (The Cycle)
-│   ├── terraform/            \# Provisioning (Infrastructure as Code)
-│   │   ├── kshitiz/          \# Edge Layer (AWS Lightsail)
-│   │   └── vyom/             \# Compute Layer (Proxmox VMs)
+├── samsara/                  # ♾️ Automation (The Cycle)
+│   ├── terraform/            # Provisioning (Infrastructure as Code)
+│   │   ├── kshitiz/          # Edge Layer (AWS Lightsail)
+│   │   └── vyom/             # Compute Layer (Proxmox VMs)
 │   │
-│   └── ansible/              \# Configuration Management
-│       ├── inventory/        \# Hosts and IPs
-│       ├── group\_vars/       \# Variables & Encrypted Secrets
-│       │   ├── brahmanda/    \# Global variables
-│       │   ├── kshitiz/      \# Edge specific
-│       │   └── vyom/         \# Compute specific
-│       ├── roles/            \# Reusable logic (Nebula, K3s, Hardening)
-│       └── playbooks/        \# Execution scripts
+│   └── ansible/              # Configuration Management
+│       ├── inventory/        # Hosts and IPs
+│       ├── group_vars/       # Variables & Encrypted Secrets
+│       │   ├── brahmanda/    # Global variables
+│       │   ├── kshitiz/      # Edge specific
+│       │   └── vyom/         # Compute specific
+│       ├── roles/            # Reusable logic (Nebula, K3s, Hardening)
+│       └── playbooks/        # Execution scripts
 │
-├── sankalpa/                 \# ☸️ Desired State (GitOps/ArgoCD)
-│   ├── core/                 \# System Apps (Longhorn, Ingress, Cert-Manager)
-│   ├── observability/        \# Prometheus, Grafana, Loki
-│   └── apps/                 \# Custom Applications (Greeter AI, Go Services)
+├── sankalpa/                 # ☸️ Desired State (GitOps/ArgoCD)
+│   ├── bootstrap.yaml        # The "Multi-Root" Manifest
+│   ├── core/                 # System Apps (Longhorn, Ingress, Cert-Manager)
+│   ├── observability/        # Prometheus, Grafana, Loki
+│   └── apps/                 # Custom Applications (Greeter AI, Go Services)
 │
-└── scripts/                  \# 🛠️ Utilities (Disaster Recovery, ISO Gen)
+├── scripts/                  # 🛠️ Utilities (Disaster Recovery, ISO Gen)(Srishti/Pralaya)
+└── Makefile                  # 🕹️ The Control Plane 
+```
 
-## **🚀 Getting Started**
+## **💥 Mahasphota (Getting Started)**
 
 ### **Prerequisites**
 
@@ -78,10 +94,10 @@ We use a **Makefile** to invoke the creation and destruction of the Brahmanda. E
    Destroy all resources to return to the void.
    make pralaya
 
-## **📜 Vidhana (Key Decisions)**
+## **📜 Vidhana (The Rules)**
 
-* **ADR-001:** Hybrid Cloud Overlay (Nebula \+ Lightsail).
-* **ADR-002:** Storage Strategy (Longhorn over Ceph).
-* **ADR-003:** Hybrid Secret Management (Ansible Vault \+ 1Password).
+**Vidhana** represents the rules that govern the Brahmanda.
 
-*"Having cut down this firmly rooted tree with the strong weapon of detachment..."* — **Gita 15.3**
+All architectural decisions are recorded as **ADRs** (Architecture Decision Records) in the [vaastu/vidhana](vaastu/vidhana/README.md) directory.
+
+*"Having cut down this firmly rooted tree (of Brahmanda) with the strong weapon of detachment..."* — **Gita 15.3**
