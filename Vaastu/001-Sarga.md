@@ -1,4 +1,4 @@
-# Pratistha (The Consecration)
+# Sarga (Creation of Material Elements and Metaphysical Principles)
 
 <p align="center">
 न रूपमस्येह तथोपलभ्यते, नान्तो न चादिर्न च सम्प्रतिष्ठा | <br>
@@ -26,7 +26,8 @@ _Goal: Procure high-performance, SRE-grade hardware. We prioritize specific comp
 | **Memory**  | 48GB **DDR5 SO-DIMM** 5600Mhz (CT48G56C46S5)    | [NationalPC](https://nationalpc.in/laptop-memory/crucial-48gb-ddr5-5600mhz-so-dimm-ct48g56c46s5)            | ₹41,300       |
 | **Storage** | 2TB **NVMe M.2 Gen4** (SN850X \- 7300MB/s Read) | [Amazon](https://www.amazon.in/dp/B0B7CMZ3QH)                                                               | ₹25,600       |
 | **Cable**   | Cat6 Snagless (Pure Bare Copper)                | [Amazon](https://www.amazon.in/dp/B0875SPZC8)                                                               | ₹1439         |
-| **Total**   | **Current Manifested Investment**               |                                                                                                             | **₹1,10,073** |
+| **Switch**  | Smart Plug (16A - Remote Kill Switch)           | [Amazon](https://www.amazon.in/Wipro-Monitoring-Appliances-Microwave-Conditioners/dp/B08HN9Q2SZ/ref=sr_1_2_sspa?s=home-improvement&sr=1-2-spons&aref=BpzHKHMwVr&sp_csd=d2lkZ2V0TmFtZT1zcF9hdGY)                                                          | ~₹1,000       |
+| **Total**   | **Current Manifested Investment**               |                                                                                                             | **₹1,11,073** |
 
 > HARDWARE NOTE: The NUC requires SO-DIMM (Laptop form factor) and NOT standard Desktop DIMMs. To achieve the 96GB goal, we use single 48GB modules at 5600Mhz. The SSD must be PCIe Gen 4 to leverage the full 7000MB/s+ throughput required for K8s etcd stability.
 
@@ -42,7 +43,7 @@ Brahmanda is designed to grow in discrete, logical iterations:
 
 ### **3\. Physical Siting (Power & Connectivity)**
 
-- **Power:** The NUC must be connected to its **120W/150W Barrel Charger** plugged into a wall outlet. Do NOT attempt to power the unit solely via a Monitor's Thunderbolt port; it will brown out under CPU load.
+- **Power:** The NUC must be connected to its **120W/150W Barrel Charger**, which is plugged into a **Smart Plug** (acting as a remote Kill Switch), and then into the wall outlet. Do NOT attempt to power the unit solely via a Monitor's Thunderbolt port.
 - **Location:** The NUC must be placed near the **Primary Router**. One ethernet port is the single point of entry for the entire universe; it must have a high-quality Cat6 physical link to the gateway.
 
 ## **Phase 2: Purvanga (Preliminary Reconnaissance)**
@@ -150,9 +151,9 @@ ssh-keygen -t ed25519 -a 100 -f ~/.ssh/id_brahmanda -C "abhishek@brahmanda"
 
 K3s tokens are automatically generated during cluster bootstrap phase. After successful K3s initialization, capture the tokens and store them in Ansible Vault for disaster recovery.
 
-## **Phase 4: Vidhana (Secret Initialization)**
+## **Phase 4: Adhisthana (The Foundation)**
 
-_Goal: Distribute secrets across the three-layer security model._
+_Goal: Security is the foundation for good infrastructure. Ensure highest security by distribute secrets across the three-layer model._
 
 ### **Secret Storage Strategy**
 
@@ -199,9 +200,11 @@ Provisioning
 2. **Vault Consecration:**
    - Navigate to `samsara/ansible/group_vars/brahmanda/`
    - Populate `vault.yml` with infrastructure secrets (Nebula CA, SSH keys, K3s tokens)
-   - Encrypt: `ansible-vault encrypt vault.yml --vault-password-file <(op read "op://Private/Ansible Vault - Samsara/password")`
+   - **Encrypt (Gopana):** Run `make gopana` to encrypt the file using the password from 1Password.
+   - **Edit (Samshodhana):** To make changes later, run `make samshodhana`.
+   - **Decrypt (Prakasha):** If you need to view the raw file, run `make prakasha`.
 
-## **Phase 5: Pratistha (OS Consecration)**
+## **Phase 5: Sarga (OS Consecration)**
 
 _Goal: The "Touchless" installation of the Hypervisor._
 
@@ -212,7 +215,7 @@ _Goal: The "Touchless" installation of the Hypervisor._
    - **Gateway:** 192.168.68.1
 4. **The Act:** Boot from the "Baked" ISO. The NUC will format, install, and reboot into the network automatically.
 
-## **Phase 6: Srishti (Manifestation Flow)**
+## **Phase 6: Samsara (The Cycle of Life)**
 
 _Goal: Running the automation from GitHub Actions._
 
@@ -224,18 +227,33 @@ _Goal: Running the automation from GitHub Actions._
    - This is the ONLY secret stored in GitHub
 
 2. **Configure Workflow to Use 1Password:**
-   ```yaml
-   - name: Load secrets from 1Password
-     uses: 1password/load-secrets-action@v1
-     with:
-       export-env: true
-     env:
-       OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-       AWS_ACCESS_KEY_ID: op://Private/AWS-samsara-iac/access-key-id
-       AWS_SECRET_ACCESS_KEY: op://Private/AWS-samsara-iac/secret-access-key
-       CLOUDFLARE_API_TOKEN: op://Private/Cloudflare/api-token
-       ANSIBLE_VAULT_PASSWORD: op://Private/Ansible Vault - Samsara/password
-   ```
+    ```yaml
+    - name: Load secrets from 1Password
+      uses: 1password/load-secrets-action@v1
+      with:
+        export-env: true
+      env:
+        OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        AWS_ACCESS_KEY_ID: op://Private/AWS-samsara-iac/access-key-id
+        AWS_SECRET_ACCESS_KEY: op://Private/AWS-samsara-iac/secret-access-key
+        CLOUDFLARE_API_TOKEN: op://Private/Cloudflare/api-token
+        ANSIBLE_VAULT_PASSWORD: op://Private/Ansible Vault - Samsara/password
+    ```
+
+    **Alternative (Stricter Approach):** For principle of least privilege, use `export-env: false` with explicit exports to prevent `OP_SERVICE_ACCOUNT_TOKEN` from being exposed to subsequent steps:
+    ```yaml
+    - name: Load secrets from 1Password
+      uses: 1password/load-secrets-action@v1
+      env:
+        OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+      with:
+        export-env: false
+        export: |
+          AWS_ACCESS_KEY_ID=op://Private/AWS-samsara-iac/access-key-id
+          AWS_SECRET_ACCESS_KEY=op://Private/AWS-samsara-iac/secret-access-key
+          CLOUDFLARE_API_TOKEN=op://Private/Cloudflare/api-token
+          ANSIBLE_VAULT_PASSWORD=op://Private/Ansible Vault - Samsara/password
+    ```
 
 ### **Execution Flow**
 
@@ -246,5 +264,17 @@ _Goal: Running the automation from GitHub Actions._
    - Exports Ansible Vault Password for playbook decryption
 3. **Terraform:** Provisions Lightsail (Kshitiz) and Proxmox VMs (Vyom)
 4. **Ansible:** Decrypts vault files and configures infrastructure
+
+## **Phase 7: Srishti (The Manifestation)**
+
+_Goal: The Big Bang. Bringing the universe into existence._
+
+We use the **Makefile** to invoke the creation.
+
+1. **Invoke Creation:**
+   ```bash
+   make srishti
+   ```
+   *Action:* This single command provisions Kshitiz (Edge) and Vyom (Compute), and bootstraps the Kubernetes cluster.
 
 **Brahmanda is now Manifested.**

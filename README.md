@@ -15,7 +15,7 @@
 
 **Project Brahmanda** is a Homelab experiment designed to simulate a production-grade, hybrid-cloud microservices environment. It adheres to the **"Asanga Shastra"** (Weapon of Detachment)—the principle that infrastructure is transient (*Naswar*) and should be capable of being destroyed and recreated at will via code.
 
-### **The Architecture**
+### **🏛️ The Architecture**
 
 The universe is divided into three planes of existence:
 
@@ -23,7 +23,7 @@ The universe is divided into three planes of existence:
 2. **Vyom (The Cluster):** The compute core. An ASUS NUC 14 Pro Plus (96GB RAM) running Proxmox and Kubernetes (K3s), where the applications live.
 3. **Samsara (The Cycle):** The automation layer. Terraform and Ansible pipelines that govern the creation, configuration, and destruction of the universe.
 
-## **📂 The Vastu (Directory Structure)**
+## **📂 The Directory Structure**
 
 This repository serves as the **Platform Monorepo**.
 ```sh
@@ -32,19 +32,14 @@ brahmanda-infra/
 │
 ├── Vaastu/                   # 🏛️ Architecture & Blueprints
 │   ├── 00_Brahmanda-Siddhanta.md # The guiding principles and philosophy
-│   ├── 01_Pratistha.md           # The setup guide
-│   ├── 02_Rachana.md             # The architecture
+│   ├── 001-Sarga.md              # The primary creation (setup)
+│   ├── 002-Visarga.md            # The secondary creation (architecture)
 │   ├── Manthana/                 # 💬 Detailed Rationale (The Churning)
 │   │   ├── README.md             # Explains Manthana's purpose
-│   │   ├── 001-Homelab-Architecture.md
-│   │   ├── 002-Storage-Strategy.md
-│   │   └── 003-Secret-Management.md
-│   ├── Vidhana/                  # 📜 ADRs (Constitutional Decisions)
+│   │   └── RFC-XXX...            # Request for Comments (Proposals)
+│   ├── Vidhana/                  # 📜 The Rules & Decisions (Constitutional Law)
 │   │   ├── README.md             # Explains Vidhana's purpose
-│   │   ├── ADR-XXX-ADR-Template.md
-│   │   ├── ADR-001-Homelab-Architecture.md
-│   │   ├── ADR-002-Storage-Strategy.md
-│   │   └── ADR-003-Secret-Management.md
+│   │   └── ADR-XXX...            # Architecture Decision Records
 │   └── Vivechana/                # 🔍 RCAs (Critical Examination)
 │       └── README.md             # Explains Vivechana's purpose
 │
@@ -63,6 +58,7 @@ brahmanda-infra/
 │       └── playbooks/        # Execution scripts
 │
 ├── sankalpa/                 # ☸️ Desired State (GitOps/ArgoCD)
+│   ├── bootstrap.yaml        # The "Multi-Root" Manifest
 │   ├── core/                 # System Apps (Longhorn, Ingress, Cert-Manager)
 │   ├── observability/        # Prometheus, Grafana, Loki
 │   └── apps/                 # Custom Applications (Greeter AI, Go Services)
@@ -71,7 +67,7 @@ brahmanda-infra/
 └── Makefile                  # 🕹️ The Control Plane 
 ```
 
-## **🚀 Getting Started**
+## **💥 Mahasphota (Getting Started)**
 
 ### **Prerequisites**
 
@@ -98,10 +94,10 @@ We use a **Makefile** to invoke the creation and destruction of the Brahmanda. E
    Destroy all resources to return to the void.
    make pralaya
 
-## **📜 Vidhana (Key Decisions)**
+## **📜 Vidhana (The Rules)**
 
-* **ADR-001:** Hybrid Cloud Overlay (Nebula \+ Lightsail).
-* **ADR-002:** Storage Strategy (Longhorn over Ceph).
-* **ADR-003:** Hybrid Secret Management (Ansible Vault \+ 1Password).
+**Vidhana** represents the rules that govern the Brahmanda.
+
+All architectural decisions are recorded as **ADRs** (Architecture Decision Records) in the [Vaastu/Vidhana](Vaastu/Vidhana/README.md) directory.
 
 *"Having cut down this firmly rooted tree (of Brahmanda) with the strong weapon of detachment..."* — **Gita 15.3**

@@ -1,5 +1,7 @@
 # **Vidhana (The Rules)**
 
+**Vidhana** represents the rules that govern the Brahmanda.
+
 This directory contains the **Vidhana** of Project Brahmanda, which are the formal Architecture Decision Records (ADRs).
 
 The word **Vidhana** can be translated as "rules," "constitution," or "ordinance." Each ADR in this directory is a constitutional-level document that records a significant architectural decision.
