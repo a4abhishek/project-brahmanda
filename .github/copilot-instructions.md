@@ -291,8 +291,8 @@ brahmanda-infra/
 - Srishti: Manifestation/Big Bang (initial deployment)
 - Pralaya: Dissolution/destruction (tear down)
 - Sankalpa: Desired state (GitOps deployments)
-- Gopana: Encryption (vault lock)
-- Prakasha: Decryption (vault reveal)
+- Tirodhana: Concealment (vault encryption - one of Shiva's five acts)
+- Avirbhava: Manifestation (vault decryption - revealing hidden truth)
 - Samshodhana: Editing (vault modification)
 
 **Storage Locations:**

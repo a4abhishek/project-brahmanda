@@ -47,29 +47,65 @@ help:
 	@echo "  help          : 📖  Shows this help message."
 	@echo ""
 	@echo "Vault Management:"
-	@echo "  gopana        : 🔒  (Encryption) Encrypts the Ansible Vault."
-	@echo "  prakasha      : 🔓  (Decryption) Decrypts the Ansible Vault."
-	@echo "  samshodhana   : 📝  (Editing) Edits the Ansible Vault in place."
+	@echo "  tirodhana     : 🔒  (Concealment) Encrypts Ansible Vault(s)."
+	@echo "  avirbhava     : 🔓  (Manifestation) Decrypts Ansible Vault(s)."
+	@echo "  samshodhana   : 📝  (Editing) Edits a specific Ansible Vault."
+	@echo ""
+	@echo "Vault Parameter:"
+	@echo "  VAULT=<name>  : Target specific vault (brahmanda|kshitiz|vyom)."
+	@echo "                  If omitted: tirodhana/avirbhava process all vaults."
+	@echo "                  Required for: samshodhana (cannot edit multiple)."
+	@echo "                  Example: make samshodhana VAULT=kshitiz"
 
 init: install_tools check_auth
 	@echo "✅ Environment is initialized and ready."
 
 # --- Vault Management ---
 
-gopana: init
-	@echo "🔒 Encrypting Ansible Vault..."
-	@ansible-vault encrypt samsara/ansible/group_vars/brahmanda/vault.yml --vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password")
-	@echo "SUCCESS: Vault encrypted."
+tirodhana:
+	@chmod +x scripts/get-vault-password.sh
+	@if [ -z "$(VAULT)" ]; then \
+		echo "🔒 Encrypting all Ansible Vaults..."; \
+		for vault in brahmanda kshitiz vyom; do \
+			if [ -f "samsara/ansible/group_vars/$$vault/vault.yml" ] && ! head -n1 "samsara/ansible/group_vars/$$vault/vault.yml" | grep -q '\$$ANSIBLE_VAULT'; then \
+				echo "  - Encrypting $$vault vault..."; \
+				ansible-vault encrypt "samsara/ansible/group_vars/$$vault/vault.yml" --vault-password-file scripts/get-vault-password.sh; \
+			fi; \
+		done; \
+		echo "SUCCESS: All vaults encrypted."; \
+	else \
+		echo "🔒 Encrypting $(VAULT) vault..."; \
+		ansible-vault encrypt "samsara/ansible/group_vars/$(VAULT)/vault.yml" --vault-password-file scripts/get-vault-password.sh; \
+		echo "SUCCESS: $(VAULT) vault encrypted."; \
+	fi
 
-prakasha: init
-	@echo "🔓 Decrypting Ansible Vault..."
-	@ansible-vault decrypt samsara/ansible/group_vars/brahmanda/vault.yml --vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password")
-	@echo "SUCCESS: Vault decrypted."
+avirbhava:
+	@chmod +x scripts/get-vault-password.sh
+	@if [ -z "$(VAULT)" ]; then \
+		echo "🔓 Decrypting all Ansible Vaults..."; \
+		for vault in brahmanda kshitiz vyom; do \
+			if [ -f "samsara/ansible/group_vars/$$vault/vault.yml" ] && head -n1 "samsara/ansible/group_vars/$$vault/vault.yml" | grep -q '\$$ANSIBLE_VAULT'; then \
+				echo "  - Decrypting $$vault vault..."; \
+				ansible-vault decrypt "samsara/ansible/group_vars/$$vault/vault.yml" --vault-password-file scripts/get-vault-password.sh; \
+			fi; \
+		done; \
+		echo "SUCCESS: All vaults decrypted."; \
+	else \
+		echo "🔓 Decrypting $(VAULT) vault..."; \
+		ansible-vault decrypt "samsara/ansible/group_vars/$(VAULT)/vault.yml" --vault-password-file scripts/get-vault-password.sh; \
+		echo "SUCCESS: $(VAULT) vault decrypted."; \
+	fi
 
-samshodhana: init
-	@echo "📝 Editing Ansible Vault..."
-	@ansible-vault edit samsara/ansible/group_vars/brahmanda/vault.yml --vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password")
-	@echo "SUCCESS: Vault editing complete."
+samshodhana:
+	@if [ -z "$(VAULT)" ]; then \
+		echo "ERROR: VAULT parameter required for editing."; \
+		echo "Usage: make samshodhana VAULT=<brahmanda|kshitiz|vyom>"; \
+		exit 1; \
+	fi
+	@echo "📝 Editing $(VAULT) Ansible Vault..."
+	@chmod +x scripts/get-vault-password.sh
+	@ansible-vault edit "samsara/ansible/group_vars/$(VAULT)/vault.yml" --vault-password-file scripts/get-vault-password.sh
+	@echo "SUCCESS: $(VAULT) vault editing complete."
 
 
 # --- Tooling Setup ---
@@ -116,14 +152,14 @@ check_auth:
 
 # --- Orchestration Targets ---
 
-srishti: init
+srishti:
 	@echo "🕉️  Manifesting the Brahmanda..."
 	@echo "INFO: This process will provision the Kshitiz (Edge) and Vyom (Compute) layers."
 	make kshitiz
 	make vyom
 	@echo "SUCCESS: Srishti (Creation) is complete. The Brahmanda has been manifested."
 
-kshitiz: init
+kshitiz:
 	@echo "☁️  Provisioning Kshitiz (Edge Layer)..."
 	@echo "INFO: Running Terraform for the Lightsail instance..."
 	#(cd samsara/terraform/kshitiz && terraform init && terraform apply -auto-approve)
@@ -131,7 +167,7 @@ kshitiz: init
 	# ansible-playbook samsara/ansible/playbooks/01-bootstrap-edge.yml --vault-password-file <(op read 'op://Project-Brahmanda/Ansible Vault - Samsara/password')
 	@echo "SUCCESS: Kshitiz has been provisioned."
 
-vyom: init
+vyom:
 	@echo "🏠  Provisioning Vyom (Compute Layer)..."
 	@echo "INFO: Running Terraform for the Proxmox VMs..."
 	#(cd samsara/terraform/vyom && terraform init && terraform apply -auto-approve)
@@ -139,7 +175,7 @@ vyom: init
 	# ansible-playbook samsara/ansible/playbooks/02-bootstrap-cluster.yml --vault-password-file <(op read 'op://Project-Brahmanda/Ansible Vault - Samsara/password')
 	@echo "SUCCESS: Vyom has been provisioned."
 
-pralaya: init
+pralaya:
 	@echo "🔥  Invoking Pralaya (Dissolution)..."
 	@echo "WARNING: This will destroy all infrastructure managed by this project."
 	@read -p "Are you sure you want to proceed? [y/N] " confirm && [[ $$confirm == [yY] || $$confirm == [yY][eE][sS] ]] || exit 1

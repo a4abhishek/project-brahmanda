@@ -105,14 +105,14 @@ Create the following items in the **"Project-Brahmanda"** vault:
 
 Use the provided Makefile targets to manage Ansible Vault files:
 
-- **Encrypt (Gopana):** Encrypt the vault file after editing.
+- **Encrypt (Tirodhana):** Encrypt the vault file after editing.
   ```bash
-  make gopana
+  make tirodhana
   ```
 
-- **Decrypt (Prakasha):** Decrypt the vault file for viewing (use sparingly).
+- **Decrypt (Avirbhava):** Decrypt the vault file for viewing (use sparingly).
   ```bash
-  make prakasha
+  make avirbhava
   ```
 
 - **Edit (Samshodhana):** Securely edit the vault file (decrypts in-memory, re-encrypts on save).
