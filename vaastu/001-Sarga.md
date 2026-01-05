@@ -669,15 +669,17 @@ This phase embodies the **Weapon of Detachment**. We create an `answer.toml` fil
 Think of it as a layered approach:
 
 ```
-Phase 6 (Pratistha): answer.toml → Proxmox VE OS installed on NUC
-Phase 7 (Samsara):   Terraform → VMs created inside Proxmox → Ansible → K3s cluster ready
+Phase 2 (Sanghatana): Hardware assembly → Operational compute node
+Phase 6 (Pratistha):  answer.toml → Proxmox VE OS installed on NUC
+Phase 7 (Samsara):    Terraform → VMs created inside Proxmox → Ansible → K3s cluster ready
+Phase 8 (Srishti):    GitOps → K3s + Applications deployed
 ```
 
 **What Gets Committed to Git:**
 
 - ✅ `answer.toml` (template with placeholders/commented SSH keys)
 - ✅ Terraform code, Ansible playbooks
-- ❌ `answer.toml.local` (your actual config with SSH keys - gitignored)
+- ❌ `answer.local.toml` (your actual config with SSH keys - gitignored)
 - ❌ Proxmox VE ISO (1-2GB, available from official source)
 - ❌ SSH private keys (store in 1Password)
 
@@ -686,18 +688,17 @@ Phase 7 (Samsara):   Terraform → VMs created inside Proxmox → Ansible → K3
 #### **Step 1: Download Proxmox VE ISO**
 
 1. Visit [Proxmox VE Downloads](https://www.proxmox.com/en/downloads/proxmox-virtual-environment)
-2. Download **Proxmox VE 8.x ISO Installer** (latest stable version)
+2. Download **Proxmox VE 9.1-1 ISO Installer** (latest stable version)
 3. Verify the checksum (optional but recommended for security)
 
-> **💡 NOTE:** Do NOT commit the ISO file to Git. ISOs are 1-2GB and would bloat the repository permanently. The answer.toml configuration is what gets committed - it enables downloading and installing from official sources with verifiable checksums.
+> **💡 NOTE:** Do NOT commit the ISO file to Git. ISOs are ~2GB and would bloat the repository permanently. The answer.toml configuration is what gets committed - it enables downloading and installing from official sources with verifiable checksums.
 
 #### **Step 2: Create Auto-Install Configuration Template (answer.toml)**
 
 Create the template configuration file that will be committed to Git:
 
 ```bash
-cd ~/project-brahmanda
-mkdir -p samsara/proxmox
+mkdir -p samsara/proxmox   # Run it from project-brahmanda repository root
 cat > samsara/proxmox/answer.toml << 'EOF'
 [global]
 keyboard = "us"
@@ -708,10 +709,9 @@ timezone = "Asia/Kolkata"
 root_password = "CHANGE_THIS_TEMPORARY_PASSWORD"
 
 # SSH Public Keys (RECOMMENDED - provides passwordless authentication)
-# Uncomment and add your SSH public key in answer.toml.local
-# root_ssh_keys = [
-#   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-key-here"
-# ]
+root_ssh_keys = [
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-key-here"
+]
 
 [network]
 source = "from-answer"
@@ -729,19 +729,23 @@ EOF
 
 - **mailto:** Real email for Proxmox notifications
 - **cidr/gateway:** Values from Phase 3 network reconnaissance
-- **fqdn:** `.local` for Day 0 (real domain configured in Phase 7)
+- **fqdn:** `.local` suffix (management interface, stays permanent)
 - **root_password:** Placeholder only - SSH keys used for actual access
 - **root_ssh_keys:** Commented out in template, added in Step 3a
 
-> **⚠️ FQDN Strategy:**
+> **⚠️ FQDN Strategy (Proxmox Host vs Services):**
 >
-> - **Day 0 (Now):** Use `proxmox.brahmanda.local` (`.local` = local network only)
-> - **Why:** At this stage, Proxmox is only accessible on your home LAN (192.168.68.200)
-> - **Your domain** (e.g., `abhishek-kashyap.com`) implies public internet access, which doesn't exist yet
-> - **Phase 7 (Later):** Ansible will configure DNS records and update hostname to your real domain
-> - **Result:** `proxmox.abhishek-kashyap.com` will resolve to Nebula IP for secure remote access
+> **Proxmox Host FQDN:**
+> - Uses `proxmox.brahmanda.local` **permanently** - this is a management interface
+> - Accessed locally: `https://192.168.68.200:8006` (your home LAN)
+> - Accessed remotely: `https://<nebula-ip>:8006` (via Nebula mesh, configured in Phase 7)
+> - **No public DNS needed** - it's infrastructure, not a public service
 >
-> This keeps Day 0 simple and prevents DNS resolution confusion during initial setup.
+> **VMs and Services (Phase 7+):**
+> - VMs created inside Proxmox will have proper hostnames
+> - K3s ingress will route public domains (e.g., `myapp.abhishek-kashyap.com`)
+> - DNS records point to Lighthouse → Nebula mesh → K3s → Application
+> - This is where your real domain gets configured, not at the Proxmox host level
 
 #### **Step 3a: Generate Credentials & Create Local Config**
 
@@ -788,13 +792,13 @@ cat ~/.ssh/proxmox-brahmanda.pub
 
 ```bash
 # Copy template to local file (gitignored)
-cp samsara/proxmox/answer.toml samsara/proxmox/answer.toml.local
+cp samsara/proxmox/answer.toml samsara/proxmox/answer.local.toml
 
 # Edit local config
-code samsara/proxmox/answer.toml.local
+code samsara/proxmox/answer.local.toml
 ```
 
-**5. Update answer.toml.local with Real Credentials:**
+**5. Update answer.local.toml with Real Credentials:**
 
 Replace the placeholder password and uncomment SSH keys:
 
@@ -810,21 +814,12 @@ root_ssh_keys = [
 **✅ Verification:**
 
 ```bash
-# Ensure local config is gitignored
-git status  # Should NOT show answer.toml.local
-
-# Verify password changed from placeholder
-grep "CHANGE_THIS" samsara/proxmox/answer.toml.local  # Should return nothing
-
-# Verify SSH key is present
-grep "ssh-ed25519" samsara/proxmox/answer.toml.local
-
 # Verify credentials stored in 1Password
 op read "op://Project-Brahmanda/Proxmox Brahmanda Root Password/password"
 op read "op://Project-Brahmanda/Proxmox Brahmanda Root SSH Key/private key"
 ```
 
-**💡 TIP:** 1Password SSH agent can automatically provide the key when you SSH - no need to specify `-i` flag.
+**💡 TIP:** 1Password SSH agent can automatically provide the key when you SSH - no need to specify `-i` flag. Configure 1Password SSH agent if not already.
 
 #### **Step 3b: Commit Template to Git (Weapon of Detachment)**
 
@@ -840,7 +835,7 @@ git push
 **Why this matters:**
 
 - Template is versioned and reproducible
-- Secrets stay in `answer.toml.local` (gitignored)
+- Secrets stay in `answer.local.toml` (gitignored)
 - Hardware failure? Generate new SSH key, update `.local`, boot from USB
 - Aligns with "Infrastructure as Code" and "Weapon of Detachment"
 
@@ -852,7 +847,7 @@ grep "CHANGE_THIS" samsara/proxmox/answer.toml  # Should find placeholder
 grep "ssh-ed25519" samsara/proxmox/answer.toml   # Should be commented out
 
 # Verify local config is gitignored
-git status | grep answer.toml.local  # Should return nothing
+git status | grep answer.local.toml  # Should return nothing
 ```
 
 #### **Step 4: Prepare Bootable USB with Auto-Install**
@@ -861,14 +856,14 @@ git status | grep answer.toml.local  # Should return nothing
 
 - USB drive (8GB minimum, will be erased)
 - Proxmox VE ISO (from Step 1)
-- `answer.toml.local` (your actual config with SSH key from Step 3a)
+- `answer.local.toml` (your actual config with SSH key from Step 3a)
 
 **Option A: Proxmox Auto-Install Assistant (Recommended)**
 
 1. Download [Proxmox Auto-Install Assistant](https://www.proxmox.com/en/downloads/proxmox-virtual-environment/auto-install-assistant)
 2. Run the assistant:
    - Select Proxmox ISO (Step 1)
-   - Upload **`answer.toml.local`** (your actual config with SSH key)
+   - Upload **`answer.local.toml`** (your actual config with SSH key)
    - Select USB drive
    - Click "Create Installation Medium"
 
@@ -887,7 +882,7 @@ sudo mkdir -p /mnt/proxmox-usb
 sudo mount /dev/sdX1 /mnt/proxmox-usb
 
 # Copy LOCAL config as answer.toml (contains your SSH key)
-sudo cp samsara/proxmox/answer.toml.local /mnt/proxmox-usb/answer.toml
+sudo cp samsara/proxmox/answer.local.toml /mnt/proxmox-usb/answer.toml
 
 # Unmount
 sudo umount /mnt/proxmox-usb
