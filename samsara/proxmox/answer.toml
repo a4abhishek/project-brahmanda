@@ -1,5 +1,5 @@
 [global]
-keyboard = "us"
+keyboard = "en-us"
 country = "us"
 fqdn = "proxmox.brahmanda.local"
 mailto = "avskksyp@gmail.com"
@@ -18,6 +18,9 @@ cidr = "192.168.68.200/20"  # Your Static IP/CIDR from Phase 3
 gateway = "192.168.68.1"     # Your Gateway from Phase 3
 dns = "8.8.8.8"
 
+[network.filter]
+SUBSYSTEM = "net"  # Match network devices
+
 [disk-setup]
 filesystem = "ext4"
-disk_list = ["sda"]  # Proxmox will use entire first disk (your 2TB NVMe)
+disk_list = ["nvme0n1"]  # NVMe drives use nvme0n1, nvme1n1, etc. (NOT sda)

@@ -22,7 +22,7 @@ INSTALL_SCRIPT := ./scripts/install_tools.sh
 
 # --- Phony Targets ---
 # These targets do not represent files.
-.PHONY: help check_tools install_tools check_auth init pratistha srishti kshitiz vyom pralaya
+.PHONY: help check_tools install_tools check_auth init tirodhana avirbhava samshodhana pratistha samskara mukti srishti kshitiz vyom pralaya
 
 # --- Main Targets ---
 
@@ -34,6 +34,8 @@ help:
 	@echo "Setup & Core Targets:"
 	@echo "  init          : 🚀  Initializes the environment: installs tools and checks authentication."
 	@echo "  pratistha     : 🖥️  (OS Consecration) Automates Proxmox ISO download, config, and USB creation."
+	@echo "  samskara      : 🕉️  (Purification) Refines Proxmox installation (repos, packages, disables popup)."
+	@echo "  mukti         : 🔓  (Liberation) Reclaims USB drive for general use after Pratistha."
 	@echo "  srishti       : 🕉️  (Creation) Provisions the Brahmanda (Kshitiz and Vyom)."
 	@echo "  pralaya       : 🔥  (Dissolution) Destroys the Brahmanda."
 	@echo ""
@@ -63,7 +65,19 @@ help:
 	@echo "  SSH_KEY_PATH=<path>    : SSH public key path (default: ~/.ssh/proxmox-brahmanda.pub)."
 	@echo "  USB_DEVICE=<device>    : Target USB device (required for pratistha)."
 	@echo "  SKIP_DOWNLOAD=true     : Skip ISO download if already cached."
+	@echo "  FORCE=true             : Force USB regeneration even if already bootable."
 	@echo "                           Example: make pratistha USB_DEVICE=/dev/sdb ROOT_PASSWORD='...'"
+	@echo ""
+	@echo "  PROXMOX_HOST=<ip>      : Proxmox host IP for samskara (default: 192.168.68.200)."
+	@echo "  KEEP_POPUP=true        : Keep subscription popup (for legal compliance, default: false)."
+	@echo "  SSH_USER=<user>        : SSH user for samskara (default: root)."
+	@echo "                           Example: make samskara PROXMOX_HOST=192.168.68.200"
+	@echo ""
+	@echo "  FORMAT=<filesystem>    : Filesystem for shuddhi (default: exfat, options: exfat, fat32, ext4, ntfs)."
+	@echo "  LABEL=<label>          : Volume label for shuddhi (default: BRAHMANDA)."
+	@echo "                           Example: make shuddhi USB_DEVICE=/dev/sdb"
+	@echo "                           Example: make shuddhi USB_DEVICE=/dev/sdb FORMAT=fat32 LABEL=\"USB_DRIVE\""
+	@echo "                           Example: make samskara KEEP_POPUP=true  # Preserve popup"
 
 init: install_tools check_auth
 	@echo "✅ Environment is initialized and ready."
@@ -125,6 +139,9 @@ check_tools:
 	@$(if $(shell command -v op),,$(error "1Password CLI (op) not found. Please run 'make install_tools' or install it manually."))
 	@$(if $(shell command -v proxmox-auto-install-assistant),,$(error "Proxmox Auto-Install Assistant not found. Please run 'make install_tools' or install it manually."))
 	@$(if $(shell command -v dasel),,$(error "dasel not found. Please run 'make install_tools' or install it manually."))
+	@$(if $(shell command -v mkfs.exfat),,$(error "exfatprogs not found. Please run 'make install_tools' or install it manually."))
+	@$(if $(shell command -v mkfs.ntfs),,$(error "ntfs-3g not found. Please run 'make install_tools' or install it manually."))
+	@$(if $(shell command -v mkfs.vfat),,$(error "dosfstools not found. Please run 'make install_tools' or install it manually."))
 	@echo "SUCCESS: All required tools are installed."
 
 install_tools:
@@ -169,6 +186,8 @@ check_auth:
 #   SSH_KEY_PATH   - Path to SSH public key (default: ~/.ssh/proxmox-brahmanda.pub)
 #   USB_DEVICE     - Target USB device (required, e.g., /dev/sdb)
 #   SKIP_DOWNLOAD  - Skip ISO download if already exists (default: false)
+#   FORCE          - Force regeneration even if USB is already bootable (default: false)
+#   VERIFY_USB     - Verify USB after creation (requires replugging, default: false)
 pratistha:
 	@echo "🖥️  Pratistha (OS Consecration) - Automating Proxmox Installation..."
 	@if [ -z "$(USB_DEVICE)" ]; then \
@@ -183,8 +202,65 @@ pratistha:
 		--root-password "$(ROOT_PASSWORD)" \
 		--ssh-key-path "$(or $(SSH_KEY_PATH),~/.ssh/proxmox-brahmanda.pub)" \
 		--usb-device "$(USB_DEVICE)" \
-		$(if $(SKIP_DOWNLOAD),--skip-download)
+		$(if $(SKIP_DOWNLOAD),--skip-download) \
+		$(if $(FORCE),--force) \
+		$(if $(VERIFY_USB),--verify-usb)
 	@echo "SUCCESS: Pratistha complete. Bootable USB ready at $(USB_DEVICE)."
+
+# Target: samskara
+# Description: Samskara (Purification/Refinement) - Post-installation configuration
+#              Refines base Proxmox installation into production-ready state
+#              By default, disables subscription popup (use KEEP_POPUP=true to preserve)
+# Parameters:
+#   PROXMOX_HOST     - Proxmox host IP/FQDN (default: 192.168.68.200)
+#   KEEP_POPUP       - Keep subscription popup for legal compliance (default: false)
+#   SSH_USER         - SSH user for connection (default: root)
+samskara:
+	@echo "🕉️  Samskara (Purification) - Refining Proxmox installation..."
+	@if [ ! -f scripts/samskara-proxmox.sh ]; then \
+		echo "ERROR: scripts/samskara-proxmox.sh not found"; \
+		exit 1; \
+	fi
+	@chmod +x scripts/samskara-proxmox.sh
+	@echo "INFO: Copying Samskara script to $(or $(PROXMOX_HOST),192.168.68.200)..."
+	@scp scripts/samskara-proxmox.sh $(or $(SSH_USER),root)@$(or $(PROXMOX_HOST),192.168.68.200):/tmp/
+	@echo "INFO: Executing Samskara on Proxmox host..."
+	@ssh $(or $(SSH_USER),root)@$(or $(PROXMOX_HOST),192.168.68.200) \
+		"chmod +x /tmp/samskara-proxmox.sh && /tmp/samskara-proxmox.sh $(if $(KEEP_POPUP),--keep-subscription-popup) && rm /tmp/samskara-proxmox.sh"
+	@echo "SUCCESS: Samskara complete. System refined and ready."
+	@echo "INFO: Access Proxmox Web UI at https://$(or $(PROXMOX_HOST),192.168.68.200):8006"
+
+# Target: mukti
+# Description: Mukti (Liberation) - Reclaim USB drive after Pratistha (OS Consecration)
+#              Formats USB to remove bootable installation media and return to general use
+#              ⚠️  WARNING: This will permanently erase ALL data on the USB device
+#              Includes safety checks (removable device verification, confirmation prompts)
+# Parameters:
+#   USB_DEVICE       - Target USB device (required, e.g., /dev/sdb)
+#   FORMAT           - Filesystem format (default: exfat, options: exfat, fat32, ext4, ntfs)
+#   LABEL            - Volume label (default: BRAHMANDA)
+#   FORCE            - Skip confirmation prompt (use for automation, default: false)
+mukti:
+	@echo "🔓  Mukti (Liberation) - Reclaiming USB drive for general use..."
+	@if [ -z "$(USB_DEVICE)" ]; then \
+		echo "ERROR: USB_DEVICE parameter required."; \
+		echo "Usage: make mukti USB_DEVICE=/dev/sdX [FORMAT=exfat] [LABEL=BRAHMANDA] [FORCE=true]"; \
+		echo "Example: make mukti USB_DEVICE=/dev/sdb"; \
+		echo "Example: make mukti USB_DEVICE=/dev/sdb FORMAT=fat32 LABEL=\"USB_DRIVE\""; \
+		echo "Example: make mukti USB_DEVICE=/dev/sdb FORCE=true  # Skip confirmation"; \
+		exit 1; \
+	fi
+	@if [ ! -f scripts/mukti-usb.sh ]; then \
+		echo "ERROR: scripts/mukti-usb.sh not found"; \
+		exit 1; \
+	fi
+	@chmod +x scripts/mukti-usb.sh
+	@sudo ./scripts/mukti-usb.sh \
+		--usb-device "$(USB_DEVICE)" \
+		--format "$(or $(FORMAT),exfat)" \
+		--label "$(or $(LABEL),BRAHMANDA)" \
+		$(if $(FORCE),--force)
+	@echo "SUCCESS: Mukti complete. USB drive liberated and ready for general use."
 
 srishti:
 	@echo "🕉️  Manifesting the Brahmanda..."

@@ -1,62 +1,142 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # initialize-macos.sh - Initialize development environment for Project Brahmanda on macOS
 #
 # This script installs the necessary tools for Project Brahmanda on macOS using Homebrew.
+# Tools installed: Terraform, Ansible, 1Password CLI, Proxmox Auto-Install Assistant, dasel
+#
 
-# Exit immediately if a command exits with a non-zero status.
-set -e
+set -euo pipefail
 
-# Function to print messages
-info() {
-    echo "INFO: $1"
+# ============================================================================
+# CONSTANTS
+# ============================================================================
+
+readonly PROXMOX_ASSISTANT_PATH="/usr/local/bin/proxmox-auto-install-assistant"
+readonly PROXMOX_ASSISTANT_URL="https://git.proxmox.com/?p=pve-installer.git;a=blob_plain;f=proxmox-auto-install-assistant;hb=HEAD"
+
+# ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
+
+# Print error message and exit
+die() {
+  echo "❌ ERROR: $*" >&2
+  exit 1
 }
 
-info "Starting tool installation for macOS..."
+# Print info message
+info() {
+  echo "ℹ️  $*"
+}
 
-# 1. Check for Homebrew
-if ! command -v brew &> /dev/null; then
-    echo "ERROR: Homebrew is not installed. Please install it first from https://brew.sh/"
-    exit 1
-fi
+# Print success message
+success() {
+  echo "✅ $*"
+}
 
-# 2. Update Homebrew
-info "Updating Homebrew..."
-brew update
+# Print warning message
+warn() {
+  echo "⚠️  WARNING: $*"
+}
 
-# 3. Install tools
-info "Installing Terraform, Ansible, and 1Password CLI..."
-# Brew install is idempotent; it will only install if the formula is not already installed.
-brew install terraform ansible 1password-cli
+# Check if command exists
+command_exists() {
+  command -v "$1" &>/dev/null
+}
 
-# 4. Install Proxmox Auto-Install Assistant
-# Note: Not available via Homebrew, must download from Proxmox Git
-info "Installing Proxmox Auto-Install Assistant..."
-PROXMOX_ASSISTANT_PATH="/usr/local/bin/proxmox-auto-install-assistant"
+# ============================================================================
+# VALIDATION FUNCTIONS
+# ============================================================================
 
-if [ -f "$PROXMOX_ASSISTANT_PATH" ] && [ -x "$PROXMOX_ASSISTANT_PATH" ]; then
-    info "Proxmox Auto-Install Assistant already installed at $PROXMOX_ASSISTANT_PATH, skipping..."
-else
-    info "Downloading Proxmox Auto-Install Assistant from Proxmox Git..."
-    PROXMOX_ASSISTANT_URL="https://git.proxmox.com/?p=pve-installer.git;a=blob_plain;f=proxmox-auto-install-assistant;hb=HEAD"
-    
-    if sudo curl --retry 3 --max-time 30 -fsSL -o "$PROXMOX_ASSISTANT_PATH" "$PROXMOX_ASSISTANT_URL" 2>/dev/null; then
-        sudo chmod +x "$PROXMOX_ASSISTANT_PATH"
-        info "✅ Proxmox Auto-Install Assistant installed to $PROXMOX_ASSISTANT_PATH"
-    else
-        echo "ERROR: Failed to download Proxmox Auto-Install Assistant"
-        echo "This tool is optional. You can continue without it."
-        echo "To install manually: sudo curl -fsSL -o $PROXMOX_ASSISTANT_PATH 'https://git.proxmox.com/?p=pve-installer.git;a=blob_plain;f=proxmox-auto-install-assistant;hb=HEAD' && sudo chmod +x $PROXMOX_ASSISTANT_PATH"
-    fi
-fi
+# Check if Homebrew is installed
+validate_homebrew() {
+  command_exists brew || die "Homebrew is not installed. Please install it first from https://brew.sh/"
+}
 
-# 5. Install dasel (multi-format data selector - used for TOML editing)
-info "Installing dasel..."
-if command -v dasel &> /dev/null; then
-    info "dasel already installed, skipping..."
-else
-    brew install dasel
-    info "✅ dasel installed via Homebrew"
-fi
+# ============================================================================
+# INSTALLATION FUNCTIONS
+# ============================================================================
 
-info "✅ Tool installation process for macOS complete."
+# Update Homebrew
+update_homebrew() {
+  info "Updating Homebrew..."
+  brew update
+  success "Homebrew updated"
+}
+
+# Install main tools via Homebrew
+install_main_tools() {
+  info "Installing Terraform, Ansible, and 1Password CLI..."
+  
+  # Brew install is idempotent; it will only install if not already present
+  brew install terraform ansible 1password-cli
+  success "Main tools installed"
+}
+
+# Install Proxmox Auto-Install Assistant
+install_proxmox_assistant() {
+  info "Installing Proxmox Auto-Install Assistant..."
+  
+  if [[ -f "$PROXMOX_ASSISTANT_PATH" ]] && [[ -x "$PROXMOX_ASSISTANT_PATH" ]]; then
+    info "Proxmox Auto-Install Assistant already installed at $PROXMOX_ASSISTANT_PATH, skipping"
+    return 0
+  fi
+  
+  info "Downloading Proxmox Auto-Install Assistant from Proxmox Git..."
+  
+  if sudo curl --retry 3 --max-time 30 -fsSL -o "$PROXMOX_ASSISTANT_PATH" "$PROXMOX_ASSISTANT_URL" 2>/dev/null; then
+    sudo chmod +x "$PROXMOX_ASSISTANT_PATH"
+    success "Proxmox Auto-Install Assistant installed to $PROXMOX_ASSISTANT_PATH"
+  else
+    warn "Failed to download Proxmox Auto-Install Assistant"
+    warn "This tool is optional. You can continue without it."
+    warn "To install manually: sudo curl -fsSL -o $PROXMOX_ASSISTANT_PATH '$PROXMOX_ASSISTANT_URL' && sudo chmod +x $PROXMOX_ASSISTANT_PATH"
+  fi
+}
+
+# Install dasel (TOML editor)
+install_dasel() {
+  info "Installing dasel..."
+  
+  if command_exists dasel; then
+    info "dasel already installed, skipping"
+    return 0
+  fi
+  
+  brew install dasel
+  success "dasel installed via Homebrew"
+}
+
+# Install filesystem tools for USB formatting
+install_filesystem_tools() {
+  info "Installing filesystem tools (exfat, ntfs-3g, dosfstools)..."
+  
+  # Brew install is idempotent; it will only install if not already present
+  brew install exfat ntfs-3g dosfstools
+  success "Filesystem tools installed"
+}
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+main() {
+  info "Starting tool installation for macOS..."
+  
+  # Validate environment
+  validate_homebrew
+  
+  # Update Homebrew
+  update_homebrew
+  
+  # Install tools
+  install_main_tools
+  install_proxmox_assistant
+  install_dasel
+  install_filesystem_tools
+  
+  success "Tool installation process for macOS complete"
+}
+
+main "$@"

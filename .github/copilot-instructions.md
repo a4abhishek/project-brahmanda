@@ -199,6 +199,16 @@ Project Brahmanda adheres to the **"Asanga Shastra"** (Weapon of Detachment) - t
 - Add verification steps to documentation, not just instructions
 - Use idiomatic patterns for the language/tool (don't simplify for brevity)
 
+**Code That Works, No Unnecessary Fallbacks:**
+- **Keep only what works as intended** - if something doesn't work, remove it or fix it
+- **No fallback mechanisms unless absolutely necessary** - Don't add multiple fallback paths "just in case"
+- If a primary approach works, don't add secondary fallback approaches
+- Example: If Git clone works, don't add wget fallback "in case Git fails"
+- Fallbacks are acceptable ONLY when:
+  - Different environments genuinely require different approaches (e.g., Linux vs macOS)
+  - A service has documented reliability issues requiring redundancy
+  - The fallback is part of a standard pattern (e.g., try multiple package mirrors)
+
 **Acceptable Shortcuts (with rationale):**
 - Using placeholder values when real values require external input: "Replace with your domain"
 - Deferring optional features: "Email notifications can be added later if needed"
@@ -209,6 +219,7 @@ Project Brahmanda adheres to the **"Asanga Shastra"** (Weapon of Detachment) - t
 - Skipping error handling "to get it working first"
 - Using `kubectl apply -f` instead of GitOps "for quick testing"
 - Incomplete documentation "to save time"
+- Adding fallback code paths "just in case" without proven need
 
 ### Iterative and Thorough Approach
 

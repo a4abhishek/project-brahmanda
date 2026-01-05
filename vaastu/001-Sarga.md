@@ -32,6 +32,13 @@ Before starting the manifestation process, ensure you have:
 - **Git:** Installed and configured with your GitHub credentials.
 - **1Password CLI (`op`):** Install from [1Password Developer Docs](https://developer.1password.com/docs/cli/get-started/).
 
+### **Hardware Requirements (Beyond NUC Components)**
+
+- **USB Drive:** 8GB minimum (will be used for bootable Proxmox installation media)
+- **Wired USB Keyboard:** Required for BIOS configuration during OS installation
+  - Bluetooth keyboards do NOT work during BIOS/boot (pre-OS environment)
+  - Can borrow temporarily if you only have Bluetooth keyboards
+
 ### **Skills Assumed**
 
 - Basic command-line navigation (cd, ls/dir, running commands).
@@ -47,13 +54,16 @@ _Goal: Procure high-performance, SRE-grade hardware. We prioritize specific comp
 | Component   | Specification                                   | Source                                                                                                                                                                                          | Price         |
 | :---------- | :---------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------ |
 | **Node**    | ASUS NUC 14 Pro Plus Kit Slim (NUC14RVSU5)      | [ITGadgets](https://itgadgetsonline.com/product/asus-nuc-14-pro-plus-kit-slim-nuc14rvsu5-mini-pc-barebone/)                                                                                     | ₹41,734       |
+| **Power Cord** | IEC C13 to Wall Plug (for NUC Power Brick)   | [Amazon](https://www.amazon.in/dp/B0FHHZCB6B?smid=AJ6SIZC8YQDZX&ref_=chk_typ_imgToDp)                                                                                                          | ₹294          |
 | **Memory**  | 48GB **DDR5 SO-DIMM** 5600Mhz (CT48G56C46S5)    | [NationalPC](https://nationalpc.in/laptop-memory/crucial-48gb-ddr5-5600mhz-so-dimm-ct48g56c46s5)                                                                                                | ₹41,300       |
 | **Storage** | 2TB **NVMe M.2 Gen4** (SN850X \- 7300MB/s Read) | [Amazon](https://www.amazon.in/dp/B0B7CMZ3QH)                                                                                                                                                   | ₹25,600       |
 | **Cable**   | Cat6 Snagless (Pure Bare Copper)                | [Amazon](https://www.amazon.in/dp/B0875SPZC8)                                                                                                                                                   | ₹1439         |
 | **Switch**  | Smart Plug (16A - Remote Kill Switch)           | [Amazon](https://www.amazon.in/Wipro-Monitoring-Appliances-Microwave-Conditioners/dp/B08HN9Q2SZ/ref=sr_1_2_sspa?s=home-improvement&sr=1-2-spons&aref=BpzHKHMwVr&sp_csd=d2lkZ2V0TmFtZT1zcF9hdGY) | ₹1,000        |
-| **Total**   | **Current Manifested Investment**               |                                                                                                                                                                                                 | **₹1,11,073** |
+| **Total**   | **Current Manifested Investment**               |                                                                                                                                                                                                 | **₹1,11,367** |
 
-> HARDWARE NOTE: The NUC requires SO-DIMM (Laptop form factor) and NOT standard Desktop DIMMs. To achieve the 96GB goal, we use single 48GB modules at 5600Mhz. The SSD must be PCIe Gen 4 to leverage the full 7000MB/s+ throughput required for K8s etcd stability.
+> **HARDWARE NOTE:** The NUC requires SO-DIMM (Laptop form factor) and NOT standard Desktop DIMMs. To achieve the 96GB goal, we use single 48GB modules at 5600Mhz. The SSD must be PCIe Gen 4 to leverage the full 7000MB/s+ throughput required for K8s etcd stability.
+
+> **⚠️ POWER CORD:** The ASUS NUC 14 Pro Plus barrel charger typically does **NOT** include a standard AC power cord (IEC C13 to wall plug). You may need to purchase one separately or reuse one from an old PC power supply. Verify your specific kit includes the power cord before assembly day.
 
 > RAM SLOT SELECTION: The NUC motherboard has two slots stacked vertically. For a single-module configuration, always use the BOTTOM slot (the one closest to the PCB). This is typically labeled DIMM 1 or Slot A. While signal termination was a concern with older DDR3/DDR4 RAM, modern DDR5 modules (like the CT48G56C46S5) have on-die termination (ODT) built-in, eliminating this issue. However, most motherboard BIOS/firmware expects Slot 0/A to be populated first, and some systems may fail to boot or require BIOS updates if only Slot 1 is populated.
 
@@ -81,8 +91,10 @@ Before starting assembly, ensure you have:
 - All components from Phase 1 (NUC, RAM, NVMe SSD, Cat6 cable, Smart Plug)
 - Clean, static-free workspace
 - Small Phillips-head screwdriver (for NUC bottom panel)
-- Flathead screwdriver (for chassis lock mechanism)
+- Flathead screwdriver Number 4 (for chassis lock mechanism)
 - Soft cloth or anti-static mat (optional but recommended)
+
+> **💡 NOTE:** USB drive and wired keyboard (mentioned in Phase 0) are NOT needed for hardware assembly. They will be required later in Phase 6 (OS Installation).
 
 ### **Assembly Steps**
 
@@ -107,7 +119,7 @@ Before starting assembly, ensure you have:
 3. **Remove screws** and carefully lift the bottom panel
 4. **Set panel and screws aside** in a safe location
 
-> **💡 TIP:** Some NUC models have a sliding latch mechanism instead of screws. Consult the quick start guide if you don't see screws. If your NUC has a chassis lock (security slot with flathead screw), use a flathead screwdriver to unlock it before attempting to remove the bottom panel.
+> **💡 TIP:** Some NUC models have a sliding latch mechanism instead of screws. Consult the quick start guide if you don't see screws. If your NUC has a chassis lock (security slot with flathead screw), use a Flathead screwdriver Number 4 to unlock it before attempting to remove the bottom panel.
 
 #### **Step 3: Install RAM Module**
 
@@ -127,15 +139,18 @@ Before starting assembly, ensure you have:
 #### **Step 4: Install NVMe SSD**
 
 1. **Locate the M.2 slot** (usually near the RAM slots, labeled M.2 or NVMe)
+   - **Multiple M.2 slots:** Your ASUS NUC 14 Pro Plus may have 3 M.2 slots
+   - **Primary M.2 slot (M Key, PCIe Gen4):** Use this for your 2TB boot drive (closest to CPU, fastest)
+   - **Secondary M.2 slots (M/B Key):** Reserve for future storage expansion → would appear as `nvme1n1`, `nvme2n1` in Linux
 2. **Remove the M.2 standoff screw** if pre-installed
 3. **Insert NVMe SSD:**
    - Hold SSD by edges
    - Align notch on SSD with key in M.2 slot
-   - Insert at 30-degree angle
+   - Insert at 30-degree angle into **primary slot**
    - Push down gently until SSD is parallel to motherboard
 4. **Secure with standoff screw** - do NOT overtighten (finger-tight is sufficient)
 
-> **💡 TIP:** The NUC supports PCIe Gen 4 speeds. Ensure the SSD is in the primary M.2 slot (some models have multiple slots with different speeds).
+> **💡 TIP:** Always install your boot drive in the **primary M.2 slot** (usually closest to CPU). This slot typically supports the fastest PCIe Gen 4 speeds and appears as `nvme0n1` in Linux. Secondary slots can be populated later for additional VM storage, Longhorn storage pools, or backup cache.
 
 **✅ Verification:** SSD should be flat against the PCB, secured by the standoff screw, with no visible gap.
 
@@ -144,7 +159,7 @@ Before starting assembly, ensure you have:
 1. **Inspect for loose components** or forgotten screws
 2. **Replace the bottom panel** - align carefully
 3. **Reinstall screws** - tighten in diagonal pattern (prevents warping)
-4. **Lock chassis** (if equipped): Use flathead screwdriver to engage the chassis lock mechanism (typically a security slot near the panel edge)
+4. **Lock chassis** (if equipped): Use Flathead screwdriver Number 4 to engage the chassis lock mechanism (typically a security slot near the panel edge)
 5. **Flip NUC right-side up**
 
 > **💡 TIP:** The chassis lock prevents unauthorized access to internal components. While optional for home use, it's good practice to engage it for security.
@@ -175,12 +190,17 @@ Before starting assembly, ensure you have:
    - BIOS/UEFI POST screen should appear on connected monitor
 3. **Expected behavior:**
    - "No bootable device" message (normal - no OS installed yet)
-   - Access BIOS by pressing **F2** or **DEL** during boot
-4. **In BIOS, verify:**
+   - Press **F2** or **DEL** during boot to access BIOS (if needed for verification)
+
+> **💡 TIP:** If you want to access BIOS now for verification, you'll need a **wired USB keyboard** (see Phase 0 requirements). Bluetooth keyboards don't work during boot. However, **BIOS configuration is not required at this stage** - you can proceed to Phase 3 and configure BIOS later before OS installation (Phase 6).
+
+**If accessing BIOS for verification:**
+
+1. **In BIOS, verify:**
    - RAM recognized: Should show 48GB (or ~47.xGB accounting for system reserved)
    - SSD recognized: Should show WD SN850X 2TB (or similar)
    - Boot order: UEFI mode enabled, secure boot settings
-5. **Power off** the NUC
+2. **Power off** the NUC
 
 **✅ Verification Checklist:**
 
@@ -263,7 +283,7 @@ From `ipconfig /all` output, record these values:
 
 _Goal: Generate authentication credentials and cryptographic identities for all infrastructure components._
 
-### **Step 1: AWS Credentials**
+### **AWS Credentials**
 
 Generate AWS credentials that will be used by Terraform to provision Lightsail (Kshitiz):
 
@@ -329,7 +349,7 @@ Generate AWS credentials that will be used by Terraform to provision Lightsail (
 
   > **💡 TIP:** In 1Password, you can easily copy the secret reference path by clicking the **▼** (downward arrow) next to any field and selecting **"Copy Secret Reference"**. This gives you the exact `op://...` path to use in commands and scripts.
 
-### **Step 2: Cloudflare Credentials**
+### **Cloudflare Credentials**
 
 Generate Cloudflare credentials for Terraform state and DNS management:
 
@@ -394,7 +414,7 @@ Generate Cloudflare credentials for Terraform state and DNS management:
 
   > **💡 NOTE:** The `R2_ENDPOINT` field is stored as configuration for IaC tools. While it can be generated programmatically from the Account ID, storing it explicitly in 1Password is common practice—it makes Terraform/Ansible configurations more readable and reduces string interpolation errors.
 
-### **Step 3: Kshitiz - Nebula Mesh Infrastructure**
+### **Kshitiz - Nebula Mesh Infrastructure**
 
 The Lighthouse requires a secure overlay network. Generate the foundational credentials:
 
@@ -443,7 +463,7 @@ While this key will be encrypted in Ansible Vault (Phase 5), you can optionally 
 
 ⚠️ **CRITICAL:** This is the root certificate authority for your entire Nebula mesh. If lost, the entire mesh must be rebuilt from scratch. The 1Password backup provides an additional recovery layer independent of Ansible Vault.
 
-### **Step 4: Vyom - Cluster Infrastructure**
+### **Vyom - Cluster Infrastructure**
 
 The compute cluster requires SSH access and K3s identity. Generate the foundational credentials.
 
@@ -685,21 +705,17 @@ Phase 8 (Srishti):    GitOps → K3s + Applications deployed
 
 ### **Installation Steps**
 
-#### **Step 1: Download Proxmox VE ISO**
+#### **Step 1: Understand the Configuration Template (answer.toml)**
 
-1. Visit [Proxmox VE Downloads](https://www.proxmox.com/en/downloads/proxmox-virtual-environment)
-2. Download **Proxmox VE 9.1-1 ISO Installer** (latest stable version)
-3. Verify the checksum (optional but recommended for security)
+The `answer.toml` file is the Infrastructure as Code definition for Proxmox installation. It's already in the repository at `samsara/proxmox/answer.toml`.
 
-> **💡 NOTE:** Do NOT commit the ISO file to Git. ISOs are ~2GB and would bloat the repository permanently. The answer.toml configuration is what gets committed - it enables downloading and installing from official sources with verifiable checksums.
+> **💡 NOTE:** The Proxmox VE ISO (~2GB) is **downloaded automatically** by the `make pratistha` script (Step 4). You don't need to manually download it. The template is committed to Git, while your actual configuration (`answer.local.toml`) is generated automatically and gitignored.
 
-#### **Step 2: Create Auto-Install Configuration Template (answer.toml)**
+#### **Step 2: Update Network Configuration in Template**
 
-Create the template configuration file that will be committed to Git:
+The template configuration file exists at `samsara/proxmox/answer.toml`. Update it with your network values from Phase 3:
 
-```bash
-mkdir -p samsara/proxmox   # Run it from project-brahmanda repository root
-cat > samsara/proxmox/answer.toml << 'EOF'
+```toml
 [global]
 keyboard = "us"
 country = "us"
@@ -721,17 +737,28 @@ dns = "8.8.8.8"
 
 [disk-setup]
 filesystem = "ext4"
-disk_list = ["sda"]  # Proxmox will use entire first disk (your 2TB NVMe)
-EOF
+disk_list = ["nvme0n1"]  # NVMe drives use nvme0n1, nvme1n1, etc. (NOT sda)
 ```
 
-**Configuration Notes:**
+> **⚠️ CRITICAL - Disk Naming:** NVMe SSDs use the naming convention `nvme0n1`, `nvme1n1`, etc., **NOT** `sda`, `sdb`. If you have multiple M.2 slots on your NUC:
+>
+> - Primary slot (closest to CPU): Usually `nvme0n1`
+> - Secondary slot: Usually `nvme1n1`
+> - To verify: Boot the NUC with Proxmox USB, press `Ctrl+Alt+F2` during installation to access console, run `lsblk` to see all disks
+> - Use the disk where you installed your 2TB SSD (should match the size)
 
-- **mailto:** Real email for Proxmox notifications
-- **cidr/gateway:** Values from Phase 3 network reconnaissance
-- **fqdn:** `.local` suffix (management interface, stays permanent)
-- **root_password:** Placeholder only - SSH keys used for actual access
-- **root_ssh_keys:** Commented out in template, added in Step 3a
+**Update These Values:**
+
+1. **mailto:** Your email for Proxmox notifications
+2. **cidr:** Your Static IP/CIDR from Phase 3 (e.g., `192.168.68.200/20`)
+3. **gateway:** Your Gateway IP from Phase 3 (e.g., `192.168.68.1`)
+4. **disk_list:** Use `nvme0n1` for NVMe SSDs (default), or verify with `lsblk` if unsure
+
+**Leave These As-Is (Auto-populated by make pratistha):**
+
+- **fqdn:** `proxmox.brahmanda.local` (management interface)
+- **root_password:** Placeholder - injected from 1Password during USB creation
+- **root_ssh_keys:** Placeholder - injected from `~/.ssh/proxmox-brahmanda.pub` or auto-generated
 
 > **⚠️ FQDN Strategy (Proxmox Host vs Services):**
 >
@@ -749,9 +776,9 @@ EOF
 > - DNS records point to Lighthouse → Nebula mesh → K3s → Application
 > - This is where your real domain gets configured, not at the Proxmox host level
 
-#### **Step 3a: Generate Credentials & Create Local Config**
+#### **Step 3: Generate and Store Credentials**
 
-**Philosophy:** Defense-in-depth requires both SSH keys (primary) and a secure password (Web UI, console, installer requirement).
+**Philosophy:** Defense-in-depth requires both SSH keys (primary) and a secure password (Web UI, console, emergency access). These credentials are stored in 1Password for reusability across reinstalls and disaster recovery.
 
 **1. Generate Secure Root Password:**
 
@@ -780,7 +807,7 @@ cat ~/.ssh/proxmox-brahmanda.pub
 - New Item → **Password** type
 - Title: `Proxmox Brahmanda Root Password`
 - Password field: Paste the generated password
-- Add note: "Root password for Proxmox Web UI (https://192.168.68.200:8006) and console access"
+- Add note: "Root password for Proxmox Web UI (<https://192.168.68.200:8006>) and console access"
 
 **3b. Store SSH Private Key:**
 
@@ -789,29 +816,6 @@ cat ~/.ssh/proxmox-brahmanda.pub
 - Title: `Proxmox Brahmanda Root SSH Key`
 - Paste contents of `~/.ssh/proxmox-brahmanda` (private key)
 - Add note: "Root SSH access to proxmox.brahmanda.local"
-
-**4. Create Local Configuration:**
-
-```bash
-# Copy template to local file (gitignored)
-cp samsara/proxmox/answer.toml samsara/proxmox/answer.local.toml
-
-# Edit local config
-code samsara/proxmox/answer.local.toml
-```
-
-**5. Update answer.local.toml with Real Credentials:**
-
-Replace the placeholder password and uncomment SSH keys:
-
-```toml
-root_password = "xK9mP2vQ8wL5nR7tY3hJ6bN4cV1a"  # Your generated password
-
-# SSH Public Keys (RECOMMENDED - provides passwordless authentication)
-root_ssh_keys = [
-  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGbPh... proxmox-brahmanda-root"
-]
-```
 
 **✅ Verification:**
 
@@ -825,11 +829,20 @@ op read "op://Project-Brahmanda/Proxmox Brahmanda Root SSH Key/private key"
 
 #### **Step 4: Prepare Bootable USB with Auto-Install**
 
+**This is where automation takes over.** The `make pratistha` script handles everything:
+
+- Downloads Proxmox ISO (with caching)
+- Fetches credentials from 1Password
+- Generates `answer.local.toml` with real credentials
+- Creates bootable USB with auto-install configuration
+
 **Requirements:**
 
-- USB drive (8GB minimum, will be erased)
-- Proxmox VE ISO (from Step 1)
-- `answer.local.toml` (your actual config with SSH key from Step 3a)
+- USB drive (8GB minimum, will be erased) - from Phase 0 hardware requirements
+- 1Password CLI authenticated (`op` command working)
+- Steps 2 and 3 completed (template updated, credentials stored)
+
+> **⚠️ DATA LOSS WARNING:** The USB drive will be completely erased. Backup any important data before proceeding.
 
 <details>
 <summary>🔌 WSL2 USB Attachment (Windows Users Only)</summary>
@@ -916,7 +929,7 @@ usbipd detach --busid 2-1
 
 </details>
 
-**Automated via Makefile (Recommended)**
+**Automated Method (Recommended - Idempotent & Production-Grade)**
 
 ```bash
 make pratistha ISO_VERSION=9.1-1 \
@@ -931,8 +944,23 @@ This automates:
 - `answer.local.toml` generation
 - Bootable USB creation
 - SSH key validation (generates if missing)
+- USB bootable detection (skips if already configured)
+- USB remove/reinsert prompt for proper recognition
 
-**💡 Practical Usage Examples:**
+**Command used for this deployment:**
+
+```bash
+# Complete command with all options (actual command used for this deployment)
+make pratistha ISO_VERSION=9.1-1 \
+  ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')" \
+  SSH_KEY_PATH=~/.ssh/proxmox-brahmanda.pub \
+  USB_DEVICE=/dev/sde \
+  SKIP_DOWNLOAD=true \
+  FORCE=true
+```
+
+<details>
+<summary>💡 Practical Usage Examples:</summary>
 
 ```bash
 # Example 1: First-time setup (auto-generate SSH keys if missing)
@@ -949,53 +977,80 @@ make pratistha \
   USB_DEVICE=/dev/sdX \
   SKIP_DOWNLOAD=true
 
-# Example 3: Use different Proxmox version
+# Example 3: Force regeneration even if USB is already bootable
+make pratistha \
+  ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')" \
+  USB_DEVICE=/dev/sdX \
+  FORCE=true
+
+# Example 4: Use different Proxmox version
 make pratistha \
   ISO_VERSION=8.2-1 \
   ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')" \
   USB_DEVICE=/dev/sdX
 
-# Example 4: Password already in environment
+# Example 5: Password already in environment
 export PROXMOX_ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')"
 make pratistha ROOT_PASSWORD="$PROXMOX_ROOT_PASSWORD" USB_DEVICE=/dev/sdX
 ```
 
+</details>
+<br>
+
+**🔄 Smart USB Detection:**
+
+The script automatically detects if your USB is already a bootable Proxmox auto-install medium (by checking for 4 partitions). If detected, it will skip recreation and show:
+
+```
+✅ USB device appears to be a Proxmox auto-install medium
+   All steps complete - USB is ready for installation!
+```
+
+To force regeneration (e.g., to update with new SSH keys or password), use `FORCE=true`.
+
 **⚠️ WARNING:** `make pratistha` will **ERASE ALL DATA** on the target USB device. Double-check the device path with `lsblk` before running.
 
 <details>
-<summary>Alternative Methods (GUI/Manual)</summary>
+<summary>Alternative Methods (For Reference Only - Use make pratistha Instead)</summary>
+
+> **⚠️ NOTE:** These methods require manual `answer.local.toml` creation and are error-prone. The automated `make pratistha` approach (above) is strongly recommended as it handles credential injection, SSH key validation, and idempotent USB creation automatically.
 
 **Alternate A: Proxmox Auto-Install Assistant (GUI)**
 
 1. Download from [Proxmox Wiki - Automated Installation](https://pve.proxmox.com/wiki/Automated_Installation)
-2. Run the assistant:
-   - Select Proxmox ISO (Step 1)
-   - Upload **`answer.local.toml`** (your actual config with SSH key)
+2. Manually create `answer.local.toml` with your credentials (see template in Step 2)
+3. Run the assistant:
+   - Select Proxmox ISO
+   - Upload `answer.local.toml`
    - Select USB drive
    - Click "Create Installation Medium"
 
 **Alternate B: Manual Method (Linux/WSL)**
 
 ```bash
-# Insert USB and identify device
+# 1. Manually create answer.local.toml from template
+cp samsara/proxmox/answer.toml samsara/proxmox/answer.local.toml
+# Edit answer.local.toml: replace password, add SSH keys
+
+# 2. Insert USB and identify device
 lsblk  # Find your USB (e.g., /dev/sdX)
 
-# Write ISO to USB (replace /dev/sdX with your device)
-sudo dd if=~/Downloads/proxmox-ve_8.x-x.iso of=/dev/sdX bs=1M status=progress
+# 3. Write ISO to USB (replace /dev/sdX with your device)
+sudo dd if=~/Downloads/proxmox-ve_9.1-1.iso of=/dev/sdX bs=1M status=progress
 sync
 
-# Mount USB and add your LOCAL config
+# 4. Mount USB and add your config
 sudo mkdir -p /mnt/proxmox-usb
 sudo mount /dev/sdX1 /mnt/proxmox-usb
 
-# Copy LOCAL config as answer.toml (contains your SSH key)
+# 5. Copy config as answer.toml
 sudo cp samsara/proxmox/answer.local.toml /mnt/proxmox-usb/answer.toml
 
-# Unmount
+# 6. Unmount
 sudo umount /mnt/proxmox-usb
 ```
 
-**✅ Verification:**
+**Verification:**
 
 ```bash
 # Verify answer.toml is on USB (with your SSH key)
@@ -1006,33 +1061,153 @@ sudo umount /mnt/proxmox-usb
 
 </details>
 
-#### **Step 5: Boot NUC and Install**
+**Important:** After USB creation completes, the script will prompt you to remove and reinsert the USB drive. This ensures your system properly recognizes the new partition table:
 
-1. **Insert USB:** Plug the bootable USB into the NUC
-2. **Power On:** Start the NUC
-3. **Boot Menu:**
-   - Press **F10** (or **ESC**/**DEL** depending on NUC model) during boot to enter Boot Menu
-   - Select the USB drive
-4. **Auto-Install:**
-   - Proxmox installer detects `answer.toml`
-   - Installation proceeds **automatically** without prompts
-   - NUC will format the NVMe, install Proxmox, configure network, and reboot
-5. **First Boot:**
-   - Remove USB drive
-   - NUC boots into Proxmox with IP `192.168.68.200` (or your configured IP)
+```
+⚠️  IMPORTANT: Please remove and reinsert the USB drive now
+   This ensures the system recognizes the new partition table
 
-**✅ Verification:** Open browser and visit `https://192.168.68.200:8006`. You should see the Proxmox login page.
+Have you removed and reinserted the USB? [y/N]:
+```
 
-#### **Step 6: Post-Installation Verification**
+After reinserting the USB:
 
-**SSH Access (Key-Based - No Password):**
+1. **Verify USB:** Run `lsblk /dev/sdX` - you should see 4 partitions (sde1, sde2, sde3, sde4)
+
+#### **Step 5: BIOS Configuration (Flexible Timing)**
+
+**When to Configure:** BIOS settings can be adjusted **before OR after** Proxmox installation. Modern ASUS NUCs typically have virtualization enabled by default, so you can proceed with installation and configure BIOS later.
+
+> **💡 TIP:** You will need a **wired USB keyboard** (from Phase 0 hardware requirements) for BIOS access. Bluetooth keyboards do not work during boot (pre-OS stage).
+
+**Recommended Settings (Configure when convenient):**
+
+1. **Enter BIOS:**
+   - Power on NUC
+   - Press **F2** (or **DEL**) immediately during boot
+
+2. **Configure Available Settings:**
+
+   **Security:**
+   - Look for: `Security` → `Secure Boot`
+   - Set to: **Disabled**
+   - **Rationale:** Prevents kernel signature issues
+
+   **Cooling:**
+   - Look for: `Advanced` → `Fan Mode`
+   - Set to: **Performance**
+   - **Avoid:** "Quiet" mode
+   - **Rationale:** Prevents thermal throttling during Kubernetes workloads
+
+   **Power Management** (if available):
+   - Look for: `Power` → `After Power Loss` or `AC Power Recovery`
+   - Set to: **Power On** or **Last State**
+   - **Rationale:** Auto-recovery after power outages
+   - **Note:** Not all NUC models have this option - skip if not found
+
+   **Virtualization** (verify only - usually pre-enabled):
+   - Look for: `Advanced` → `CPU Configuration` or `Processor`
+   - Verify **Intel VT-x**: **Enabled**
+   - Verify **Intel VT-d**: **Enabled**
+   - **Note:** Modern ASUS NUCs have these enabled by default
+   - **If you can't find these options:** They're likely already enabled or hidden when active
+
+3. **Save and Exit:**
+   - Press **F10** to save changes
+
+**✅ Post-Install Verification (Run after Proxmox is installed):**
 
 ```bash
-# SSH using your private key
-ssh -i ~/.ssh/proxmox-brahmanda root@192.168.68.200
-
-# Or if using 1Password SSH agent (automatic)
+# Verify virtualization is working
 ssh root@192.168.68.200
+
+# Check if VT-x/VT-d are enabled
+egrep -c '(vmx|svm)' /proc/cpuinfo
+# Expected: Number > 0 (shows CPU virtualization is active)
+
+# Check IOMMU (VT-d) status
+dmesg | grep -i iommu
+# Expected: "DMAR: IOMMU enabled" or similar
+
+# Exit
+exit
+```
+
+**If virtualization verification fails:**
+
+- Enter BIOS and search for "Virtualization Technology", "VT-x", "VT-d", "Intel Virtualization"
+- These settings might be in different menus depending on BIOS version
+- Consult ASUS NUC manual if you can't locate them
+
+**🎯 Summary:** Secure Boot (disabled) and Fan Mode (Performance) are the most important settings you've already configured. Virtualization is likely already enabled. Power management is optional.
+
+#### **Step 6: Boot from USB and Auto-Install**
+
+> **💡 REMINDER:** Ensure your wired USB keyboard is connected before powering on. You'll need it to access the boot menu.
+
+1. **Boot Menu:**
+   - Insert the bootable USB drive (created in Step 4)
+   - Power on the NUC
+   - Press **F10** (or **ESC** depending on model) during boot to enter Boot Menu
+   - Select the USB drive (should appear as "UEFI: USB Device" or similar)
+
+2. **Auto-Install Process:**
+   - Proxmox installer detects `answer.toml` automatically
+   - Installation proceeds **without prompts**:
+     - Formats NVMe SSD
+     - Installs Proxmox VE
+     - Configures network (192.168.68.200)
+     - Installs SSH keys
+     - Reboots automatically
+
+3. **First Boot:**
+   - Remove USB drive after installation completes
+   - NUC boots into Proxmox with IP `192.168.68.200` (or your configured IP)
+
+**✅ Verification:** Open browser and visit `https://192.168.68.200:8006`. You should see the Proxmox login page (accept the self-signed certificate warning).
+
+**⏱️ Expected Duration:** 10-15 minutes from boot to login screen
+
+#### **Step 7: Installation Verification & Samskara**
+
+**What You'll See After Installation:**
+
+After the auto-install completes and the NUC reboots, you'll see this at the console:
+
+```
+-----------------------------------------------------------------------------
+Welcome to the Proxmox Virtual Environment. Please use your web browser to
+ configure this server - connect to:
+https://192.168.68.200:8006/
+-----------------------------------------------------------------------------
+proxmox login: _
+```
+
+**✅ This is normal!** You do NOT need to login at the console. This is the end of **Phase 6 (Pratistha - OS Installation)**.
+
+**What This Means:**
+
+- ✅ Proxmox VE is successfully installed and running
+- ✅ You have a bare metal hypervisor ready to host virtual machines
+- ✅ Infrastructure as Code for OS layer is complete (answer.toml in Git)
+
+**What's Still Missing (Automated in Phase 7):**
+
+- ⏳ Virtual machines (VMs) for K3s nodes
+- ⏳ Nebula mesh network configuration
+- ⏳ K3s Kubernetes cluster
+- ⏳ Longhorn storage, ArgoCD, observability stack
+
+**SSH Access (Key-Based - Recommended):**
+
+Test SSH access from your workstation (not at the console):
+
+```bash
+# If using 1Password SSH agent (recommended - zero config)
+ssh root@192.168.68.200
+
+# Or manually specify the key
+ssh -i ~/.ssh/proxmox-brahmanda root@192.168.68.200
 
 # Verify installation
 pveversion          # Check Proxmox version
@@ -1043,19 +1218,63 @@ hostname -f         # Should show proxmox.brahmanda.local
 
 **Web UI Access:**
 
+Open browser to: `https://192.168.68.200:8006` (or your configured IP)
+
 ```
-URL: https://192.168.68.200:8006
 Username: root
-Password: (retrieve from 1Password: "Proxmox Brahmanda Root Password")
+Password: [Retrieve from 1Password: "Proxmox Brahmanda Root Password"]
 ```
 
-**Or use 1Password CLI:**
+**💡 TIP:** Use 1Password CLI to copy password directly:
 
 ```bash
-# Copy password to clipboard
 op read "op://Project-Brahmanda/Proxmox Brahmanda Root Password/password" | pbcopy  # macOS
-op read "op://Project-Brahmanda/Proxmox Brahmanda Root Password/password" | clip     # Windows
+op read "op://Project-Brahmanda/Proxmox Brahmanda Root Password/password" | clip     # Windows/WSL
 ```
+
+**📋 Subscription Notice (Normal - Not an Error)**
+
+After logging in, you'll see this popup:
+
+```
+You do not have a valid subscription for this server.
+Please visit www.proxmox.com to get a list of available options.
+```
+
+**This is completely normal!** You're using the free **Proxmox VE Community Edition** which is fully functional. This notice appears on every login but doesn't affect functionality.
+
+**Options:**
+
+- **Click "OK" each time** (recommended for production awareness)
+- **Disable the popup** (optional - see below)
+
+<details>
+<summary>Optional: Disable Subscription Popup</summary>
+
+If you prefer to disable the popup notification:
+
+```bash
+# SSH into Proxmox
+ssh root@192.168.68.200
+
+# Navigate to web toolkit directory
+cd /usr/share/javascript/proxmox-widget-toolkit/
+
+# Backup the original file
+cp proxmoxlib.js proxmoxlib.js.bak
+
+# Disable the subscription check popup
+sed -i.bak '/No valid subscription/,/callback: function(btn)/s/Ext\.Msg\.show/void/' proxmoxlib.js
+
+# Restart the web interface
+systemctl restart pveproxy
+```
+
+**Note:** This modification is cosmetic only. It doesn't provide a subscription or bypass any limitations. The Community Edition remains fully functional.
+
+After running these commands, refresh your browser - the subscription popup will no longer appear on login.
+
+</details>
 
 **✅ Verification Checklist:**
 
@@ -1067,11 +1286,71 @@ op read "op://Project-Brahmanda/Proxmox Brahmanda Root Password/password" | clip
 
 **Post-Install Tasks:**
 
-```bash
-# Add Proxmox host to your local /etc/hosts
-echo "192.168.68.200  proxmox.brahmanda.local proxmox" | sudo tee -a /etc/hosts
+**1. Samskara (Purification/Refinement)**
 
-# Optional: Test 1Password SSH agent integration
+The default Proxmox installation uses Enterprise repositories which require a paid subscription. **Samskara** refines the base installation into production-ready state.
+
+**Automated Approach (Recommended):**
+
+```bash
+# Basic usage (disables subscription popup by default)
+make samskara PROXMOX_HOST=192.168.68.200
+
+# Keep subscription popup (for legal compliance if required)
+make samskara PROXMOX_HOST=192.168.68.200 KEEP_POPUP=true
+
+# Run script directly
+scp scripts/samskara-proxmox.sh root@192.168.68.200:/tmp/
+ssh root@192.168.68.200 "chmod +x /tmp/samskara-proxmox.sh && /tmp/samskara-proxmox.sh"
+```
+
+**What the script does:**
+
+- ✅ Disables enterprise repositories (`pve-enterprise.list`, `ceph.list`)
+- ✅ Enables community (no-subscription) repository
+- ✅ Updates package lists (`apt-get update`)
+- ✅ Upgrades all packages (`apt-get dist-upgrade`)
+- ✅ Disables subscription popup (default, use `--keep-subscription-popup` to preserve)
+- ✅ Idempotent: Safe to run multiple times (checks state, doesn't create duplicate backups)
+
+**✅ Verification:** Run `ssh root@192.168.68.200 "apt-get update"` - you should see no errors about 401 Unauthorized.
+
+<details>
+<summary><strong>Manual Approach (Alternative)</strong></summary>̥
+
+If you prefer manual configuration or need to troubleshoot:
+
+```bash
+# SSH into Proxmox
+ssh root@192.168.68.200
+
+# Disable enterprise repositories
+mv /etc/apt/sources.list.d/pve-enterprise.list /etc/apt/sources.list.d/pve-enterprise.list.disabled
+mv /etc/apt/sources.list.d/ceph.list /etc/apt/sources.list.d/ceph.list.disabled
+
+# Add community (no-subscription) repository
+echo "deb http://download.proxmox.com/debian/pve trixie pve-no-subscription" > /etc/apt/sources.list.d/pve-no-subscription.list
+
+# Update package lists
+apt-get update
+
+# Upgrade packages (recommended)
+apt-get dist-upgrade -y
+```
+
+**Why this is needed:** Without this, package updates will fail with "401 Unauthorized" errors because the enterprise repositories require authentication.
+</details>
+
+**2. Add Proxmox to Local Hosts File**
+
+```bash
+# On your workstation (not Proxmox host)
+echo "192.168.68.200  proxmox.brahmanda.local proxmox" | sudo tee -a /etc/hosts
+```
+
+**3. Optional: Test 1Password SSH Agent**
+
+```bash
 ssh-add -L  # Should list your key if 1Password agent is running
 ```
 
@@ -1081,6 +1360,39 @@ ssh-add -L  # Should list your key if 1Password agent is running
 - **Web UI:** Requires password from 1Password (used for initial setup and administration)
 - **Console:** Emergency access with password (physical access or out-of-band management)
 - **Defense-in-Depth:** Both password and SSH key stored in 1Password for disaster recovery
+
+### **Troubleshooting Installation Issues**
+
+**Error: "disk in 'disk-selection' not found"**
+
+This means Proxmox cannot find the disk specified in `answer.toml`. Common causes:
+
+1. **Wrong disk name:** NVMe drives use `nvme0n1`, `nvme1n1`, etc., NOT `sda`
+   - **Fix:** Update `disk_list = ["nvme0n1"]` in `samsara/proxmox/answer.toml`
+   - Recreate USB with `make pratistha` (it will regenerate `answer.local.toml`)
+
+2. **Multiple M.2 slots - wrong slot specified:**
+   - Your ASUS NUC may have multiple M.2 slots (M Key, B Key, or combo slots)
+   - **To verify which disk to use:**
+     1. Boot from Proxmox USB
+     2. When installer starts, press **Ctrl+Alt+F2** to access console
+     3. Login as `root` (no password)
+     4. Run: `lsblk -o NAME,SIZE,TYPE,MOUNTPOINT`
+     5. Identify your 2TB SSD (will show as `nvme0n1` or `nvme1n1` with ~2TB size)
+     6. Press **Ctrl+Alt+F1** to return to installer
+     7. Abort installation, update `answer.toml` with correct disk name
+     8. Recreate USB and try again
+
+3. **SSD not detected at all:**
+   - Verify SSD is properly seated in M.2 slot (see Phase 2, Step 4)
+   - Check BIOS shows the SSD (Phase 6, Step 5)
+   - Ensure you're using the **primary M.2 slot** (closest to CPU, usually fastest)
+
+**Multiple M.2 Slots Strategy:**
+
+- **Primary slot (M Key):** Use this for your 2TB Proxmox boot drive (usually `nvme0n1`)
+- **Secondary slots:** Can be used for additional storage in future expansion (VLAN storage, backup cache)
+- **Tip:** Some NUC models have slots with different speeds (Gen4 vs Gen3) - check manual
 
 ---
 
@@ -1117,11 +1429,10 @@ Once Proxmox VE is running, you have the **foundation** but not yet the **univer
 
 **Next Steps:**
 
-1. **Phase 7 (Samsara):** Write Terraform configs in `samsara/terraform/vyom/` to create VMs
-2. **Phase 7 (Samsara):** Write Ansible playbooks in `samsara/ansible/playbooks/` to configure VMs
-3. **Phase 8 (Srishti):** Deploy K3s and applications via GitOps
+1. **Phase 7 (Samsara):** Terraform provisions VMs inside Proxmox + Ansible configures them
+2. **Phase 8 (Srishti):** GitOps deploys K3s cluster and applications
 
-This phased approach ensures each layer is testable and reproducible independently.
+Each layer is independently testable and follows the **Weapon of Detachment** principle - destroy and recreate at will.
 
 ## **Phase 7: Samsara (The Cycle of Life)**
 
@@ -1182,9 +1493,11 @@ _Goal: The Big Bang. Bringing the universe into existence._
 We use the **Makefile** to invoke the creation.
 
 1. **Invoke Creation:**
+
    ```bash
    make srishti
    ```
+
    _Action:_ This single command provisions Kshitiz (Edge) and Vyom (Compute), and bootstraps the Kubernetes cluster.
 
 **Brahmanda is now Manifested.**
