@@ -736,12 +736,14 @@ EOF
 > **⚠️ FQDN Strategy (Proxmox Host vs Services):**
 >
 > **Proxmox Host FQDN:**
+>
 > - Uses `proxmox.brahmanda.local` **permanently** - this is a management interface
 > - Accessed locally: `https://192.168.68.200:8006` (your home LAN)
 > - Accessed remotely: `https://<nebula-ip>:8006` (via Nebula mesh, configured in Phase 7)
 > - **No public DNS needed** - it's infrastructure, not a public service
 >
 > **VMs and Services (Phase 7+):**
+>
 > - VMs created inside Proxmox will have proper hostnames
 > - K3s ingress will route public domains (e.g., `myapp.abhishek-kashyap.com`)
 > - DNS records point to Lighthouse → Nebula mesh → K3s → Application
@@ -821,35 +823,6 @@ op read "op://Project-Brahmanda/Proxmox Brahmanda Root SSH Key/private key"
 
 **💡 TIP:** 1Password SSH agent can automatically provide the key when you SSH - no need to specify `-i` flag. Configure 1Password SSH agent if not already.
 
-#### **Step 3b: Commit Template to Git (Weapon of Detachment)**
-
-Commit only the template (no secrets):
-
-```bash
-# Commit template with placeholders
-git add samsara/proxmox/answer.toml
-git commit -m "feat(proxmox): add auto-install template with SSH key support"
-git push
-```
-
-**Why this matters:**
-
-- Template is versioned and reproducible
-- Secrets stay in `answer.local.toml` (gitignored)
-- Hardware failure? Generate new SSH key, update `.local`, boot from USB
-- Aligns with "Infrastructure as Code" and "Weapon of Detachment"
-
-**🔒 Security Check:**
-
-```bash
-# Verify template has no secrets
-grep "CHANGE_THIS" samsara/proxmox/answer.toml  # Should find placeholder
-grep "ssh-ed25519" samsara/proxmox/answer.toml   # Should be commented out
-
-# Verify local config is gitignored
-git status | grep answer.local.toml  # Should return nothing
-```
-
 #### **Step 4: Prepare Bootable USB with Auto-Install**
 
 **Requirements:**
@@ -858,20 +831,154 @@ git status | grep answer.local.toml  # Should return nothing
 - Proxmox VE ISO (from Step 1)
 - `answer.local.toml` (your actual config with SSH key from Step 3a)
 
-**Option A: Proxmox Auto-Install Assistant (Recommended)**
+<details>
+<summary>🔌 WSL2 USB Attachment (Windows Users Only)</summary>
 
-1. Download [Proxmox Auto-Install Assistant](https://www.proxmox.com/en/downloads/proxmox-virtual-environment/auto-install-assistant)
+WSL2 does not automatically mount USB drives. If you're running this from WSL on Windows, you must attach the USB using `usbipd` first.
+
+**One-time setup (PowerShell as Administrator):**
+
+```powershell
+# Install usbipd-win
+winget install usbipd
+
+# IMPORTANT: Restart PowerShell after installation
+# The 'usbipd' command won't be available until you close and reopen PowerShell
+```
+
+**After restarting PowerShell, attach USB to WSL:**
+
+```powershell
+# 1. List USB devices (PowerShell as Administrator)
+usbipd list
+
+# Output example:
+# BUSID  VID:PID    DEVICE                                  STATE
+# 2-13   0781:5595  USB Mass Storage Device                 Shared
+
+# 2. Find your USB drive (look for "USB Mass Storage Device")
+# Note the BUSID (e.g., 2-13 in the example above)
+
+# 3. If STATE shows "Shared", skip to step 4
+# If STATE shows "Not shared", bind the device first (one-time):
+usbipd bind --busid 2-13
+
+# 4. Attach to WSL
+usbipd attach --wsl --busid 2-13
+
+# 5. Load USB storage driver (WSL2 doesn't load it automatically)
+wsl sudo modprobe usb-storage && sleep 2
+```
+
+**💡 TIP:** If you see a warning about USB filter 'USBPcap', you can ignore it or use `usbipd bind --force --busid 2-13` if binding fails.
+
+**Verify in WSL:**
+
+```bash
+# In WSL, check if USB is now visible
+lsblk
+
+# You should now see a new device (e.g., /dev/sde)
+# NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+# sde      8:64   1 232.9G  0 disk
+# `-sde1   8:65   1 232.9G  0 part    <-- Your USB drive partition
+
+# Use this device path with make pratistha
+make pratistha USB_DEVICE=/dev/sde ...
+```
+
+**How to distinguish your USB from other disks:**
+
+1. **RM column = 1:** Removable media flag (USB drives show `1`, WSL virtual disks show `0`)
+2. **Device order:** Your USB will be `/dev/sde` or later (WSL always uses `sda`-`sdd` for Windows system volumes)
+3. **Size matches:** The size should match your USB capacity (e.g., 14.9G, 29.8G, 58.6G, 232.9G)
+4. **Timing:** Only appears after `modprobe usb-storage` and `usbipd attach`
+5. **Cross-check with lsusb:** Correlate the vendor/model from `lsusb` (e.g., "SanDisk Corp.") with the device
+
+**Example comparison:**
+
+```bash
+lsblk
+# sda-sdd: RM=0 (not removable), WSL/Windows virtual disks
+# sde:     RM=1 (removable), your physical USB drive ✓
+```
+
+**After USB creation, detach (PowerShell):**
+
+```powershell
+# Detach from WSL so Windows can access it
+usbipd detach --busid 2-1
+```
+
+**💡 TIP:** The USB device path in WSL (e.g., `/dev/sde`) is different from the Windows drive letter (e.g., `D:`). Always use `lsblk` in WSL to identify the correct device after attachment.
+
+**⚠️ CRITICAL:** The devices you see in WSL by default (`sda`, `sdb`, `sdc`, `sdd`) are virtual/Windows system volumes. Your physical USB will only appear after using `usbipd attach`.
+
+</details>
+
+**Automated via Makefile (Recommended)**
+
+```bash
+make pratistha ISO_VERSION=9.1-1 \
+  ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')" \
+  SSH_KEY_PATH=~/.ssh/proxmox-brahmanda.pub \
+  USB_DEVICE=/dev/sdX
+```
+
+This automates:
+
+- ISO download with progress
+- `answer.local.toml` generation
+- Bootable USB creation
+- SSH key validation (generates if missing)
+
+**💡 Practical Usage Examples:**
+
+```bash
+# Example 1: First-time setup (auto-generate SSH keys if missing)
+# Replace /dev/sdX with YOUR USB device from lsblk
+lsblk  # Identify USB device
+make pratistha \
+  ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')" \
+  USB_DEVICE=/dev/sdX
+
+# Example 2: Re-create USB with existing ISO (skip download)
+make pratistha \
+  ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')" \
+  SSH_KEY_PATH=~/.ssh/proxmox-brahmanda.pub \
+  USB_DEVICE=/dev/sdX \
+  SKIP_DOWNLOAD=true
+
+# Example 3: Use different Proxmox version
+make pratistha \
+  ISO_VERSION=8.2-1 \
+  ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')" \
+  USB_DEVICE=/dev/sdX
+
+# Example 4: Password already in environment
+export PROXMOX_ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')"
+make pratistha ROOT_PASSWORD="$PROXMOX_ROOT_PASSWORD" USB_DEVICE=/dev/sdX
+```
+
+**⚠️ WARNING:** `make pratistha` will **ERASE ALL DATA** on the target USB device. Double-check the device path with `lsblk` before running.
+
+<details>
+<summary>Alternative Methods (GUI/Manual)</summary>
+
+**Alternate A: Proxmox Auto-Install Assistant (GUI)**
+
+1. Download from [Proxmox Wiki - Automated Installation](https://pve.proxmox.com/wiki/Automated_Installation)
 2. Run the assistant:
    - Select Proxmox ISO (Step 1)
    - Upload **`answer.local.toml`** (your actual config with SSH key)
    - Select USB drive
    - Click "Create Installation Medium"
 
-**Option B: Manual Method (Linux/WSL)**
+**Alternate B: Manual Method (Linux/WSL)**
 
 ```bash
 # Insert USB and identify device
-lsblk  # Find your USB (e.g., /dev/sdb)
+lsblk  # Find your USB (e.g., /dev/sdX)
 
 # Write ISO to USB (replace /dev/sdX with your device)
 sudo dd if=~/Downloads/proxmox-ve_8.x-x.iso of=/dev/sdX bs=1M status=progress
@@ -896,6 +1003,8 @@ sudo mount /dev/sdX1 /mnt/proxmox-usb
 grep "ssh-ed25519" /mnt/proxmox-usb/answer.toml  # Should show your public key
 sudo umount /mnt/proxmox-usb
 ```
+
+</details>
 
 #### **Step 5: Boot NUC and Install**
 

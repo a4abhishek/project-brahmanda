@@ -22,7 +22,7 @@ INSTALL_SCRIPT := ./scripts/install_tools.sh
 
 # --- Phony Targets ---
 # These targets do not represent files.
-.PHONY: help check_tools install_tools check_auth init srishti kshitiz vyom pralaya
+.PHONY: help check_tools install_tools check_auth init pratistha srishti kshitiz vyom pralaya
 
 # --- Main Targets ---
 
@@ -33,6 +33,7 @@ help:
 	@echo ""
 	@echo "Setup & Core Targets:"
 	@echo "  init          : 🚀  Initializes the environment: installs tools and checks authentication."
+	@echo "  pratistha     : 🖥️  (OS Consecration) Automates Proxmox ISO download, config, and USB creation."
 	@echo "  srishti       : 🕉️  (Creation) Provisions the Brahmanda (Kshitiz and Vyom)."
 	@echo "  pralaya       : 🔥  (Dissolution) Destroys the Brahmanda."
 	@echo ""
@@ -51,11 +52,18 @@ help:
 	@echo "  avirbhava     : 🔓  (Manifestation) Decrypts Ansible Vault(s)."
 	@echo "  samshodhana   : 📝  (Editing) Edits a specific Ansible Vault."
 	@echo ""
-	@echo "Vault Parameter:"
-	@echo "  VAULT=<name>  : Target specific vault (brahmanda|kshitiz|vyom)."
-	@echo "                  If omitted: tirodhana/avirbhava process all vaults."
-	@echo "                  Required for: samshodhana (cannot edit multiple)."
-	@echo "                  Example: make samshodhana VAULT=kshitiz"
+	@echo "Parameters:"
+	@echo "  VAULT=<name>           : Target specific vault (brahmanda|kshitiz|vyom)."
+	@echo "                           If omitted: tirodhana/avirbhava process all vaults."
+	@echo "                           Required for: samshodhana (cannot edit multiple)."
+	@echo "                           Example: make samshodhana VAULT=kshitiz"
+	@echo ""
+	@echo "  ISO_VERSION=<version>  : Proxmox version for pratistha (default: 9.1-1)."
+	@echo "  ROOT_PASSWORD=<pass>   : Root password (use 1Password: \\$$\(op read '...'\\))."
+	@echo "  SSH_KEY_PATH=<path>    : SSH public key path (default: ~/.ssh/proxmox-brahmanda.pub)."
+	@echo "  USB_DEVICE=<device>    : Target USB device (required for pratistha)."
+	@echo "  SKIP_DOWNLOAD=true     : Skip ISO download if already cached."
+	@echo "                           Example: make pratistha USB_DEVICE=/dev/sdb ROOT_PASSWORD='...'"
 
 init: install_tools check_auth
 	@echo "✅ Environment is initialized and ready."
@@ -115,6 +123,8 @@ check_tools:
 	@$(if $(shell command -v terraform),,$(error "Terraform not found. Please run 'make install_tools' or install it manually."))
 	@$(if $(shell command -v ansible),,$(error "Ansible not found. Please run 'make install_tools' or install it manually."))
 	@$(if $(shell command -v op),,$(error "1Password CLI (op) not found. Please run 'make install_tools' or install it manually."))
+	@$(if $(shell command -v proxmox-auto-install-assistant),,$(error "Proxmox Auto-Install Assistant not found. Please run 'make install_tools' or install it manually."))
+	@$(if $(shell command -v dasel),,$(error "dasel not found. Please run 'make install_tools' or install it manually."))
 	@echo "SUCCESS: All required tools are installed."
 
 install_tools:
@@ -122,13 +132,13 @@ install_tools:
 	@case "$(shell uname -s)" in \
 		Linux) \
 			echo "INFO: Linux detected. Running Linux installation script."; \
-			chmod +x ./scripts/install-linux.sh; \
-			./scripts/install-linux.sh; \
+			chmod +x ./scripts/initialize-linux.sh; \
+			./scripts/initialize-linux.sh; \
 			;; \
 		Darwin) \
 			echo "INFO: macOS detected. Running macOS installation script."; \
-			chmod +x ./scripts/install-macos.sh; \
-			./scripts/install-macos.sh; \
+			chmod +x ./scripts/initialize-macos.sh; \
+			./scripts/initialize-macos.sh; \
 			;; \
 		*) \
 			echo "ERROR: Unsupported OS. Please install tools manually."; \
@@ -151,6 +161,30 @@ check_auth:
 
 
 # --- Orchestration Targets ---
+
+# Pratistha: Automated Proxmox Installation
+# Parameters:
+#   ISO_VERSION    - Proxmox VE version (default: 9.1-1)
+#   ROOT_PASSWORD  - Root password (required, use 1Password)
+#   SSH_KEY_PATH   - Path to SSH public key (default: ~/.ssh/proxmox-brahmanda.pub)
+#   USB_DEVICE     - Target USB device (required, e.g., /dev/sdb)
+#   SKIP_DOWNLOAD  - Skip ISO download if already exists (default: false)
+pratistha:
+	@echo "🖥️  Pratistha (OS Consecration) - Automating Proxmox Installation..."
+	@if [ -z "$(USB_DEVICE)" ]; then \
+		echo "ERROR: USB_DEVICE parameter required."; \
+		echo "Usage: make pratistha USB_DEVICE=/dev/sdX [ISO_VERSION=9.1-1] [ROOT_PASSWORD=...] [SSH_KEY_PATH=...]"; \
+		echo "Example: make pratistha USB_DEVICE=/dev/sdb ROOT_PASSWORD=\$$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')"; \
+		exit 1; \
+	fi
+	@chmod +x scripts/pratistha-proxmox.sh
+	@./scripts/pratistha-proxmox.sh \
+		--iso-version "$(or $(ISO_VERSION),9.1-1)" \
+		--root-password "$(ROOT_PASSWORD)" \
+		--ssh-key-path "$(or $(SSH_KEY_PATH),~/.ssh/proxmox-brahmanda.pub)" \
+		--usb-device "$(USB_DEVICE)" \
+		$(if $(SKIP_DOWNLOAD),--skip-download)
+	@echo "SUCCESS: Pratistha complete. Bootable USB ready at $(USB_DEVICE)."
 
 srishti:
 	@echo "🕉️  Manifesting the Brahmanda..."

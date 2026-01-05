@@ -1,0 +1,23 @@
+[global]
+keyboard = "us"
+country = "us"
+fqdn = "proxmox.brahmanda.local"
+mailto = "avskksyp@gmail.com"
+timezone = "Asia/Kolkata"
+root_password = "CHANGE_THIS_TEMPORARY_PASSWORD"
+
+# SSH Public Keys (RECOMMENDED - provides passwordless authentication)
+# Uncomment and add your SSH public key in answer.toml.local
+# root_ssh_keys = [
+#   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-key-here"
+# ]
+
+[network]
+source = "from-answer"
+cidr = "192.168.68.200/20"  # Your Static IP/CIDR from Phase 3
+gateway = "192.168.68.1"     # Your Gateway from Phase 3
+dns = "8.8.8.8"
+
+[disk-setup]
+filesystem = "ext4"
+disk_list = ["sda"]  # Proxmox will use entire first disk (your 2TB NVMe)

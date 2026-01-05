@@ -8,6 +8,31 @@ Project Brahmanda adheres to the **"Asanga Shastra"** (Weapon of Detachment) - t
 
 > "The real form of this tree (of Brahmanda) is not perceived in this world... Having cut down this firmly rooted tree with the strong weapon of detachment..." — Bhagavad Gita 15.3
 
+### Idempotency Principle
+
+**All automation must be idempotent wherever possible:**
+- Scripts can be run multiple times without adverse effects
+- Failed operations can be resumed without starting from scratch
+- Already-completed tasks are skipped intelligently
+- State checks occur before destructive operations
+- Clear messages indicate what was done vs. what was skipped
+
+**Achieving idempotency through statelessness:**
+- **Prefer statelessness:** Idempotency achieved through stateless operations is ideal
+- **When state is unavoidable:** Keep state limited and concentrated in specific locations
+- **Benefit:** Rest of the system remains stateless and simpler to reason about
+- **Examples:**
+  - Stateless: `dpkg -l | grep -qw terraform` (queries system state, no custom state file)
+  - Concentrated state: Terraform state files (single source of truth, rest is declarative)
+  - Concentrated state: `.cache/iso/` directory (download state isolated, scripts remain stateless)
+
+**Examples of idempotent design:**
+- `make init` checks if tools exist before installing (stateless: queries system)
+- `make pratistha` reuses cached ISO (concentrated state: `.cache/` directory)
+- Repository additions check if already configured (stateless: checks system files)
+- File operations verify existence before downloading (stateless: file system is the state)
+- Encryption/decryption check vault state before acting (stateless: reads file header)
+
 ## Project Goals
 
 ### Primary Purpose: Learning
@@ -302,10 +327,18 @@ brahmanda-infra/
 
 ## Code Standards
 
+**All Code Must Be Idempotent:**
+- Check state before making changes
+- Skip operations that are already complete
+- Provide clear feedback about what was done vs. skipped
+- Handle partial failures gracefully (resume capability)
+- Use tools' native idempotency features (apt, brew, Terraform, Ansible)
+
 ### Terraform
 - Prefix resources with `kshitiz-` or `vyom-`
 - Use explicit resource naming
 - Include tags: `Project = "Brahmanda"`, `ManagedBy = "Terraform"`
+- Inherently idempotent through state management
 
 ### Kubernetes
 - All manifests must be ArgoCD Application CRDs
