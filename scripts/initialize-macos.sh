@@ -69,8 +69,26 @@ update_homebrew() {
 install_main_tools() {
   info "Installing Terraform, Ansible, and 1Password CLI..."
   
+  # Check Terraform version requirement (>= 1.9.0)
+  local required_version="1.9.0"
+  local current_version=""
+  
+  if command_exists terraform; then
+    current_version=$(terraform version -json 2>/dev/null | grep -oP '"terraform_version":\s*"\K[^"]+' || echo "0.0.0")
+    
+    if printf '%s\n%s\n' "$required_version" "$current_version" | sort -V -C 2>/dev/null; then
+      info "Terraform $current_version already installed (>= $required_version), skipping"
+    else
+      info "Terraform $current_version is too old (< $required_version), upgrading..."
+      brew upgrade terraform
+    fi
+  else
+    info "Installing Terraform..."
+    brew install terraform
+  fi
+  
   # Brew install is idempotent; it will only install if not already present
-  brew install terraform ansible 1password-cli
+  brew install ansible 1password-cli
   success "Main tools installed"
 }
 

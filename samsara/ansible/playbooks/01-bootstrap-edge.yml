@@ -1,0 +1,156 @@
+---
+# Playbook: Bootstrap Kshitiz (Edge Layer)
+# Purpose: Configure AWS Lightsail as Nebula Lighthouse
+# Run after: terraform apply in samsara/terraform/kshitiz
+
+- name: Bootstrap Kshitiz - Nebula Lighthouse
+  hosts: kshitiz
+  become: yes
+  gather_facts: yes
+
+  vars:
+    nebula_version: "1.9.5"
+    nebula_network: "10.42.0.0/16"
+    lighthouse_ip: "10.42.0.1/16"
+    lighthouse_port: 4242
+    nebula_ca_name: "Brahmanda Nebula CA"
+    nebula_config_dir: "/etc/nebula"
+    nebula_bin_dir: "/usr/local/bin"
+
+  tasks:
+    - name: Display target host information
+      debug:
+        msg: "Configuring {{ inventory_hostname }} at {{ ansible_host }}"
+
+    # ========================================================================
+    # Nebula Certificate Authority Setup
+    # ========================================================================
+
+    - name: Check if Nebula CA already exists
+      stat:
+        path: "{{ nebula_config_dir }}/ca.key"
+      register: ca_key_stat
+
+    - name: Generate Nebula CA (if not exists)
+      shell: |
+        cd {{ nebula_config_dir }}
+        {{ nebula_bin_dir }}/nebula-cert ca -name "{{ nebula_ca_name }}"
+      when: not ca_key_stat.stat.exists
+
+    - name: Generate Lighthouse certificate
+      shell: |
+        cd {{ nebula_config_dir }}
+        {{ nebula_bin_dir }}/nebula-cert sign \
+          -name "kshitiz-lighthouse" \
+          -ip "{{ lighthouse_ip }}" \
+          -groups "lighthouse,edge"
+      args:
+        creates: "{{ nebula_config_dir }}/kshitiz-lighthouse.crt"
+
+    - name: Rename certificates for consistency
+      shell: |
+        cd {{ nebula_config_dir }}
+        mv kshitiz-lighthouse.crt lighthouse.crt
+        mv kshitiz-lighthouse.key lighthouse.key
+      args:
+        creates: "{{ nebula_config_dir }}/lighthouse.crt"
+
+    - name: Set correct permissions on certificates
+      file:
+        path: "{{ nebula_config_dir }}/{{ item }}"
+        mode: '0600'
+        owner: root
+        group: root
+      loop:
+        - ca.key
+        - lighthouse.key
+
+    - name: Set read permissions on public certs
+      file:
+        path: "{{ nebula_config_dir }}/{{ item }}"
+        mode: '0644'
+        owner: root
+        group: root
+      loop:
+        - ca.crt
+        - lighthouse.crt
+
+    # ========================================================================
+    # Nebula Configuration
+    # ========================================================================
+
+    - name: Deploy Nebula Lighthouse configuration
+      template:
+        src: ../templates/nebula-lighthouse.yml.j2
+        dest: "{{ nebula_config_dir }}/config.yml"
+        mode: '0644'
+        owner: root
+        group: root
+      notify: restart nebula
+
+    # ========================================================================
+    # Systemd Service
+    # ========================================================================
+
+    - name: Create Nebula systemd service
+      copy:
+        dest: /etc/systemd/system/nebula.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Nebula Overlay Network
+          After=network.target
+          Wants=network.target
+          
+          [Service]
+          Type=simple
+          ExecStart={{ nebula_bin_dir }}/nebula -config {{ nebula_config_dir }}/config.yml
+          Restart=always
+          RestartSec=5
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier=nebula
+          
+          [Install]
+          WantedBy=multi-user.target
+      notify:
+        - reload systemd
+        - restart nebula
+
+    - name: Enable and start Nebula service
+      systemd:
+        name: nebula
+        enabled: yes
+        state: started
+
+    # ========================================================================
+    # Verification
+    # ========================================================================
+
+    - name: Wait for Nebula interface to come up
+      wait_for:
+        path: /sys/class/net/nebula1
+        timeout: 30
+
+    - name: Verify Nebula interface has correct IP
+      shell: ip addr show nebula1 | grep -q "{{ lighthouse_ip }}"
+      changed_when: false
+
+    - name: Display Nebula status
+      shell: systemctl status nebula --no-pager
+      register: nebula_status
+      changed_when: false
+
+    - name: Show Nebula status
+      debug:
+        var: nebula_status.stdout_lines
+
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: restart nebula
+      systemd:
+        name: nebula
+        state: restarted

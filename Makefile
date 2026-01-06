@@ -135,6 +135,12 @@ samshodhana:
 check_tools:
 	@echo "INFO: Checking for required tools..."
 	@$(if $(shell command -v terraform),,$(error "Terraform not found. Please run 'make install_tools' or install it manually."))
+	@TERRAFORM_VERSION=$$(terraform version -json 2>/dev/null | grep -oP '"terraform_version":\s*"\K[^"]+' || echo "0.0.0"); \
+	if ! printf '%s\n%s\n' "1.9.0" "$$TERRAFORM_VERSION" | sort -V -C 2>/dev/null; then \
+		echo "ERROR: Terraform version $$TERRAFORM_VERSION is too old (< 1.9.0 required)."; \
+		echo "Please run 'make install_tools' to upgrade."; \
+		exit 1; \
+	fi
 	@$(if $(shell command -v ansible),,$(error "Ansible not found. Please run 'make install_tools' or install it manually."))
 	@$(if $(shell command -v op),,$(error "1Password CLI (op) not found. Please run 'make install_tools' or install it manually."))
 	@$(if $(shell command -v proxmox-auto-install-assistant),,$(error "Proxmox Auto-Install Assistant not found. Please run 'make install_tools' or install it manually."))

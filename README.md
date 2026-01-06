@@ -26,6 +26,7 @@ The universe is divided into three planes of existence:
 ## **📂 The Directory Structure**
 
 This repository serves as the **Platform Monorepo**.
+
 ```sh
 brahmanda-infra/
 ├── .github/                  # CI Pipelines (GitHub Actions)
@@ -64,7 +65,7 @@ brahmanda-infra/
 │   └── apps/                 # Custom Applications (Greeter AI, Go Services)
 │
 ├── scripts/                  # 🛠️ Utilities (Disaster Recovery, ISO Gen)(Srishti/Pralaya)
-└── Makefile                  # 🕹️ The Control Plane 
+└── Makefile                  # 🕹️ The Control Plane
 ```
 
 ## **💥 Mahasphota (Getting Started)**
@@ -74,6 +75,14 @@ brahmanda-infra/
 * **Hardware:** ASUS NUC 14 Pro Plus (Project Vyom).
 * **Software:** 1Password CLI (op), Terraform, Ansible, Make.
 * **Access:** You must have the **Vault Password** stored in your 1Password keychain to decrypt the infrastructure secrets.
+* **SSH Key** for accessing Lightsail instance:
+
+  ```bash
+  # Generate if you don't have one
+  ssh-keygen -t ed25519 -f ~/.ssh/kshitiz-lighthouse -C "kshitiz-lighthouse"
+
+  # Add to 1Password: "Kshitiz Lighthouse SSH Key"
+  ```
 
 ### **Quick Start (The Divine Commands)**
 

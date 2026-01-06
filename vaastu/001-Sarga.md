@@ -63,6 +63,17 @@ _Goal: Procure high-performance, SRE-grade hardware. We prioritize specific comp
 
 > **HARDWARE NOTE:** The NUC requires SO-DIMM (Laptop form factor) and NOT standard Desktop DIMMs. To achieve the 96GB goal, we use single 48GB modules at 5600Mhz. The SSD must be PCIe Gen 4 to leverage the full 7000MB/s+ throughput required for K8s etcd stability.
 
+> **⚠️ QUALIFIED VENDOR LIST (QVL) - IMPORTANT:**
+> ASUS provides a [QVL for NUC 14 Kits](https://dlcdnets.asus.com/pub/ASUS/NUC/QVL/ASUS_NUC_Kits_Revel_NUC14RVx_QVL_v1.00.pdf) listing tested and certified memory/storage components. However:
+>
+> - **QVL is NOT exhaustive** - Components not listed may still work perfectly
+> - **This project uses non-QVL hardware** - All components (RAM: CT48G56C46S5, SSD: WD SN850X) are NOT on the official QVL
+> - **Real-world experience:** Non-QVL components often work without issues if specifications match (DDR5 SO-DIMM, PCIe Gen4 M.2)
+> - **Risk assessment:** QVL provides guaranteed compatibility, but limits options and may increase cost
+> - **What to watch for:** Boot failures, memory errors, or SSD not detected usually indicate genuine incompatibility (not just "not on QVL")
+>̥
+> **Recommendation:** If you have budget flexibility, use QVL-listed components for peace of mind. If sourcing from QVL is difficult or expensive (as in this deployment), prioritize matching specifications (form factor, interface, speed) and be prepared for potential compatibility issues (though uncommon with reputable brands).
+
 > **⚠️ POWER CORD:** The ASUS NUC 14 Pro Plus barrel charger typically does **NOT** include a standard AC power cord (IEC C13 to wall plug). You may need to purchase one separately or reuse one from an old PC power supply. Verify your specific kit includes the power cord before assembly day.
 
 > RAM SLOT SELECTION: The NUC motherboard has two slots stacked vertically. For a single-module configuration, always use the BOTTOM slot (the one closest to the PCB). This is typically labeled DIMM 1 or Slot A. While signal termination was a concern with older DDR3/DDR4 RAM, modern DDR5 modules (like the CT48G56C46S5) have on-die termination (ODT) built-in, eliminating this issue. However, most motherboard BIOS/firmware expects Slot 0/A to be populated first, and some systems may fail to boot or require BIOS updates if only Slot 1 is populated.
@@ -449,19 +460,82 @@ This creates `ca.crt` (public) and `ca.key` (private). The `ca.key` will be encr
 - `ca.crt` (Nebula CA certificate - public)
 - `ca.key` (Nebula CA private key - **NEVER share this**)
 
-**💡 Optional: Store in 1Password for Backup**
+**Generate Lighthouse Certificate:**
 
-While this key will be encrypted in Ansible Vault (Phase 5), you can optionally store it in 1Password as a disaster recovery backup:
+Now generate the certificate for the Kshitiz lighthouse node:
+
+```bash
+cd ~/.nebula
+nebula-cert sign -name "kshitiz-lighthouse" -ip "10.42.0.1/16" -ca-crt ca.crt -ca-key ca.key
+```
+
+This creates:
+
+- `kshitiz-lighthouse.crt` (lighthouse certificate)
+- `kshitiz-lighthouse.key` (lighthouse private key)
+
+**✅ Verification:** Run `ls -la ~/.nebula/`. You should now see four files:
+
+- `ca.crt` - CA certificate (public, shared with all nodes)
+- `ca.key` - CA private key (secure, used to sign node certificates)
+- `kshitiz-lighthouse.crt` - Lighthouse certificate
+- `kshitiz-lighthouse.key` - Lighthouse private key
+
+💡 **TIP:** The IP `10.42.0.1` is the Nebula mesh IP for the lighthouse (not the AWS public IP). The `/16` means this node can communicate with the entire `10.42.0.0/16` network.
+
+**💡 Optional: Store Certificates in 1Password for Backup**
+
+While these certificates will be encrypted in Ansible Vault (Phase 5), you can optionally store them in 1Password as a disaster recovery backup:
+
+**1. Store Nebula CA (Root Certificate Authority):**
 
 1. Open 1Password → Navigate to **"Project-Brahmanda"** vault.
 2. Create a new **Secure Note** item:
-   - **Title:** `Nebula-CA-Root-Key`
-   - In the note field, paste the contents of `~/.nebula/ca.key` (the CA private key)
-3. Add a field for the public certificate:
+   - **Title:** `Nebula-CA-Root-Certificate`
+3. Add text fields for both certificate and key:
    - **Add Field → Text:** `ca.crt` → Paste the contents of `~/.nebula/ca.crt`
+   - **Add Field → Text:** `ca.key` → Paste the contents of `~/.nebula/ca.key` (the CA private key)
 4. Save the item.
 
-⚠️ **CRITICAL:** This is the root certificate authority for your entire Nebula mesh. If lost, the entire mesh must be rebuilt from scratch. The 1Password backup provides an additional recovery layer independent of Ansible Vault.
+⚠️ **CRITICAL:** This is the root certificate authority for your entire Nebula mesh. If lost, the entire mesh must be rebuilt from scratch.
+
+**2. Store Lighthouse Certificates:**
+
+1. In 1Password, create a new **Secure Note** item:
+   - **Title:** `Nebula-Kshitiz-Lighthouse-Certificate`
+2. Add text fields for certificate, key, and metadata:
+   - **Add Field → Text:** `kshitiz-lighthouse.crt` → Paste the contents of `~/.nebula/kshitiz-lighthouse.crt`
+   - **Add Field → Text:** `kshitiz-lighthouse.key` → Paste the contents of `~/.nebula/kshitiz-lighthouse.key` (the lighthouse private key)
+   - **Add Field → Text:** `nebula_ip` → Enter `10.42.0.1`
+3. Save the item.
+
+💡 **TIP:** Copy file contents to clipboard:
+
+```bash
+# macOS
+cat ~/.nebula/kshitiz-lighthouse.key | pbcopy
+
+# Linux/WSL
+cat ~/.nebula/kshitiz-lighthouse.key | clip.exe
+```
+
+**✅ Verification:** Test that certificates are stored correctly:
+
+```bash
+# Verify CA certificate
+op read "op://Project-Brahmanda/Nebula-CA-Root-Certificate/ca.crt"
+
+# Verify CA private key
+op read "op://Project-Brahmanda/Nebula-CA-Root-Certificate/ca.key"
+
+# Verify Lighthouse certificate
+op read "op://Project-Brahmanda/Nebula-Kshitiz-Lighthouse-Certificate/kshitiz-lighthouse.crt"
+
+# Verify Lighthouse private key
+op read "op://Project-Brahmanda/Nebula-Kshitiz-Lighthouse-Certificate/kshitiz-lighthouse.key"
+```
+
+The 1Password backup provides an additional recovery layer independent of Ansible Vault.
 
 ### **Vyom - Cluster Infrastructure**
 
@@ -1100,10 +1174,9 @@ After reinserting the USB:
    - **Rationale:** Prevents thermal throttling during Kubernetes workloads
 
    **Power Management** (if available):
-   - Look for: `Power` → `After Power Loss` or `AC Power Recovery`
+   - Look for: `Power, Performance, Cooliing` → `Secondary Power` → `After Power Failure`
    - Set to: **Power On** or **Last State**
    - **Rationale:** Auto-recovery after power outages
-   - **Note:** Not all NUC models have this option - skip if not found
 
    **Virtualization** (verify only - usually pre-enabled):
    - Look for: `Advanced` → `CPU Configuration` or `Processor`

@@ -78,20 +78,34 @@ install_prerequisites() {
 configure_hashicorp_repo() {
   info "Configuring HashiCorp APT repository..."
   
-  if [[ -f /etc/apt/sources.list.d/hashicorp.list ]] || \
-     grep -q "apt.releases.hashicorp.com" /etc/apt/sources.list 2>/dev/null; then
-    info "HashiCorp repository already configured, skipping"
-    return 0
+  local ubuntu_codename=$(lsb_release -cs)
+  local repo_file="/etc/apt/sources.list.d/hashicorp.list"
+  local expected_repo="deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com ${ubuntu_codename} main"
+  
+  # Check if repository exists and is correctly configured for current Ubuntu version
+  if [[ -f "$repo_file" ]]; then
+    local current_repo=$(cat "$repo_file" 2>/dev/null | grep -v '^#' | head -n1)
+    
+    if [[ "$current_repo" == "$expected_repo" ]]; then
+      info "HashiCorp repository already correctly configured for ${ubuntu_codename}, skipping"
+      return 0
+    else
+      info "HashiCorp repository configured for wrong Ubuntu version, reconfiguring for ${ubuntu_codename}..."
+      sudo rm -f "$repo_file"
+    fi
   fi
   
-  wget -O- https://apt.releases.hashicorp.com/gpg | \
-    gpg --dearmor | \
-    sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
+  # Install GPG key
+  if [[ ! -f /usr/share/keyrings/hashicorp-archive-keyring.gpg ]]; then
+    wget -O- https://apt.releases.hashicorp.com/gpg | \
+      gpg --dearmor | \
+      sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
+  fi
   
-  echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
-    sudo tee /etc/apt/sources.list.d/hashicorp.list
+  # Add repository for current Ubuntu version
+  echo "$expected_repo" | sudo tee "$repo_file" > /dev/null
   
-  success "HashiCorp repository configured"
+  success "HashiCorp repository configured for ${ubuntu_codename}"
 }
 
 # Configure 1Password APT repository
@@ -124,14 +138,61 @@ install_main_tools() {
   
   sudo apt-get update
   
-  if dpkg -l | grep -qw terraform && \
-     dpkg -l | grep -qw 1password-cli && \
-     dpkg -l | grep -qw pipx; then
-    info "Terraform, 1Password CLI, and pipx already installed, skipping"
-    return 0
+  # Check if 1Password CLI and pipx need installation
+  local install_1password=false
+  local install_pipx=false
+  
+  dpkg -l | grep -qw 1password-cli || install_1password=true
+  dpkg -l | grep -qw pipx || install_pipx=true
+  
+  # Install 1Password CLI and pipx if needed
+  if $install_1password || $install_pipx; then
+    local packages=""
+    $install_1password && packages="$packages 1password-cli"
+    $install_pipx && packages="$packages pipx"
+    sudo apt-get install -y $packages
   fi
   
-  sudo apt-get install -y terraform 1password-cli pipx
+  # Check Terraform version requirement (>= 1.9.0)
+  local required_version="1.9.0"
+  local current_version=""
+  
+  if command_exists terraform; then
+    current_version=$(terraform version -json 2>/dev/null | grep -oP '"terraform_version":\s*"\K[^"]+' || terraform version | head -n1 | grep -oP 'v\K[0-9.]+' || echo "0.0.0")
+    
+    if printf '%s\n%s\n' "$required_version" "$current_version" | sort -V -C 2>/dev/null; then
+      info "Terraform $current_version already installed (>= $required_version), skipping"
+    else
+      info "Terraform $current_version is too old (< $required_version), upgrading..."
+      info "Removing old Terraform installation..."
+      sudo apt-get remove -y terraform || true
+      sudo rm -f /usr/bin/terraform /usr/local/bin/terraform
+      
+      info "Installing latest Terraform from HashiCorp repository..."
+      sudo apt-get update
+      sudo apt-get install -y terraform
+      
+      # Verify installation
+      local new_version=$(terraform version -json 2>/dev/null | grep -oP '"terraform_version":\s*"\K[^"]+' || terraform version | head -n1 | grep -oP 'v\K[0-9.]+' || echo "0.0.0")
+      if printf '%s\n%s\n' "$required_version" "$new_version" | sort -V -C 2>/dev/null; then
+        success "Terraform upgraded to $new_version"
+      else
+        die "Failed to upgrade Terraform. Current version: $new_version (required: >= $required_version)"
+      fi
+    fi
+  else
+    info "Installing Terraform..."
+    sudo apt-get install -y terraform
+    
+    # Verify installation
+    local installed_version=$(terraform version -json 2>/dev/null | grep -oP '"terraform_version":\s*"\K[^"]+' || terraform version | head -n1 | grep -oP 'v\K[0-9.]+' || echo "0.0.0")
+    if printf '%s\n%s\n' "$required_version" "$installed_version" | sort -V -C 2>/dev/null; then
+      success "Terraform $installed_version installed"
+    else
+      die "Terraform installation failed or version too old. Current: $installed_version (required: >= $required_version)"
+    fi
+  fi
+  
   success "Main tools installed"
 }
 
