@@ -2,7 +2,7 @@
 variable "aws_region" {
   description = "AWS region for Lightsail instance"
   type        = string
-  default     = "us-east-1"
+  default     = "ap-southeast-1" # Singapore
 }
 
 variable "instance_bundle_id" {
@@ -21,7 +21,7 @@ variable "instance_bundle_id" {
 variable "nebula_version" {
   description = "Nebula version to install"
   type        = string
-  default     = "1.9.5"
+  default     = "1.10.0"
 }
 
 variable "nebula_lighthouse_port" {
