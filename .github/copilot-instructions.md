@@ -137,7 +137,10 @@ Project Brahmanda adheres to the **"Asanga Shastra"** (Weapon of Detachment) - t
 - Architecture Decision Records - Finalized decisions only (Vidhanas are the fundamental laws that govern the Brahmanda)
 - Must include: Context (brief), Decision (detailed with implementation), Implementation (code examples, configurations, commands), Consequences
 - ADRs are **implementation guides** - no discussion of rejected alternatives, focus on "what and how to execute"
-- Every ADR must reference its corresponding RFC for rationale
+- **One ADR per domain, multiple RFCs can enhance it:** A single ADR can reference multiple RFCs as the solution evolves
+  - Example: ADR-003 (Secret Management) references both RFC-003 (hybrid model) and RFC-006 (automation)
+  - Git history tracks the evolution of the ADR over time
+  - Update date when ADR is amended with new RFC implementation
 
 **vivechana/ (Critical Examination - RCAs)**
 - Root Cause Analysis - Post-incident reviews
@@ -327,9 +330,11 @@ brahmanda-infra/
 - Srishti: Manifestation/Big Bang (initial deployment)
 - Pralaya: Dissolution/destruction (tear down)
 - Sankalpa: Desired state (GitOps deployments)
-- Tirodhana: Concealment (vault encryption - one of Shiva's five acts)
-- Avirbhava: Manifestation (vault decryption - revealing hidden truth)
+- Nidhi-Tirodhana: Treasury concealment (vault generation + encryption - generate from 1Password)
+- Nidhi-Avirbhava: Treasury manifestation (vault decryption - reveal hidden truth)
+- Nidhi-Nikasha: Treasury touchstone test (vault verification - testing gold purity)
 - Samshodhana: Editing (vault modification)
+- Nidhi: Treasure repository (vault generation from 1Password)
 
 **Storage Locations:**
 - 1Password Vault: "Project-Brahmanda" (NOT "Private")
@@ -365,6 +370,11 @@ brahmanda-infra/
 - NEVER hardcode credentials
 - Always reference: `op://Project-Brahmanda/item/field` or `{{ vault_variable }}`
 - Document which vault stores which secret
+- **Vault Generation:** Use `make nidhi-tirodhana` to generate Ansible vaults from 1Password templates
+  - Templates: `group_vars/*/vault.yml.tpl` with `op://` secret references
+  - Generated vaults: `group_vars/*/vault.yml` (encrypted, committed to Git)
+  - Verify: `make nidhi-nikasha` checks all vaults decrypt correctly
+  - Single vault: `make nidhi-tirodhana VAULT=kshitiz` (kshitiz|vyom|brahmanda)
 
 ## File Maintenance
 

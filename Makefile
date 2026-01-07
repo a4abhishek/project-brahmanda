@@ -22,7 +22,7 @@ INSTALL_SCRIPT := ./scripts/install_tools.sh
 
 # --- Phony Targets ---
 # These targets do not represent files.
-.PHONY: help check_tools install_tools check_auth init tirodhana avirbhava samshodhana pratistha samskara mukti srishti kshitiz vyom pralaya
+.PHONY: help check_tools install_tools check_auth init nidhi-tirodhana nidhi-avirbhava samshodhana nidhi-nikasha pratistha samskara mukti srishti kshitiz vyom pralaya
 
 # --- Main Targets ---
 
@@ -50,13 +50,14 @@ help:
 	@echo "  help          : 📖  Shows this help message."
 	@echo ""
 	@echo "Vault Management:"
-	@echo "  tirodhana     : 🔒  (Concealment) Encrypts Ansible Vault(s)."
-	@echo "  avirbhava     : 🔓  (Manifestation) Decrypts Ansible Vault(s)."
-	@echo "  samshodhana   : 📝  (Editing) Edits a specific Ansible Vault."
+	@echo "  nidhi-tirodhana : 🔒💎  (Treasury Concealment) Generates and encrypts vault(s) from 1Password."
+	@echo "  nidhi-avirbhava : 🔓💎  (Treasury Manifestation) Decrypts Ansible Vault(s)."
+	@echo "  samshodhana     : 📝    (Editing) Edits a specific Ansible Vault."
+	@echo "  nidhi-nikasha   : 🪨💎  (Treasury Touchstone Test) Verifies all vaults can be decrypted."
 	@echo ""
 	@echo "Parameters:"
 	@echo "  VAULT=<name>           : Target specific vault (brahmanda|kshitiz|vyom)."
-	@echo "                           If omitted: tirodhana/avirbhava process all vaults."
+	@echo "                           If omitted: nidhi-tirodhana/nidhi-avirbhava process all vaults."
 	@echo "                           Required for: samshodhana (cannot edit multiple)."
 	@echo "                           Example: make samshodhana VAULT=kshitiz"
 	@echo ""
@@ -84,24 +85,54 @@ init: install_tools check_auth
 
 # --- Vault Management ---
 
-tirodhana:
+nidhi-tirodhana:
 	@chmod +x scripts/get-vault-password.sh
 	@if [ -z "$(VAULT)" ]; then \
-		echo "🔒 Encrypting all Ansible Vaults..."; \
+		echo "💎🔒 Nidhi-Tirodhana: Generating and securing all treasure repositories..."; \
 		for vault in brahmanda kshitiz vyom; do \
-			if [ -f "samsara/ansible/group_vars/$$vault/vault.yml" ] && ! head -n1 "samsara/ansible/group_vars/$$vault/vault.yml" | grep -q '\$$ANSIBLE_VAULT'; then \
-				echo "  - Encrypting $$vault vault..."; \
-				ansible-vault encrypt "samsara/ansible/group_vars/$$vault/vault.yml" --vault-password-file scripts/get-vault-password.sh; \
+			if [ -f "samsara/ansible/group_vars/$$vault/vault.tpl.yml" ]; then \
+				echo "  → Processing $$vault..."; \
+				op inject -i "samsara/ansible/group_vars/$$vault/vault.tpl.yml" -o "samsara/ansible/group_vars/$$vault/vault.tmp.yml" && \
+				ansible-vault encrypt "samsara/ansible/group_vars/$$vault/vault.tmp.yml" \
+					--vault-password-file=scripts/get-vault-password.sh \
+					--output="samsara/ansible/group_vars/$$vault/vault.yml" && \
+				rm -f "samsara/ansible/group_vars/$$vault/vault.tmp.yml" && \
+				echo "  ✅ $$vault treasury secured"; \
+			else \
+				echo "  ⚠️  No template found for $$vault (skipping)"; \
 			fi; \
 		done; \
-		echo "SUCCESS: All vaults encrypted."; \
+		echo "✅ All treasure repositories secured successfully"; \
 	else \
-		echo "🔒 Encrypting $(VAULT) vault..."; \
-		ansible-vault encrypt "samsara/ansible/group_vars/$(VAULT)/vault.yml" --vault-password-file scripts/get-vault-password.sh; \
-		echo "SUCCESS: $(VAULT) vault encrypted."; \
+		echo "💎🔒 Nidhi-Tirodhana: Generating and securing $(VAULT) treasury..."; \
+		if [ ! -f "samsara/ansible/group_vars/$(VAULT)/vault.tpl.yml" ]; then \
+			echo "❌ Template not found: samsara/ansible/group_vars/$(VAULT)/vault.tpl.yml"; \
+			exit 1; \
+		fi; \
+		op inject -i "samsara/ansible/group_vars/$(VAULT)/vault.tpl.yml" -o "samsara/ansible/group_vars/$(VAULT)/vault.tmp.yml" && \
+		ansible-vault encrypt "samsara/ansible/group_vars/$(VAULT)/vault.tmp.yml" \
+			--vault-password-file=scripts/get-vault-password.sh \
+			--output="samsara/ansible/group_vars/$(VAULT)/vault.yml" && \
+		rm -f "samsara/ansible/group_vars/$(VAULT)/vault.tmp.yml" && \
+		echo "✅ $(VAULT) treasury secured successfully"; \
 	fi
 
-avirbhava:
+nidhi-nikasha:
+	@chmod +x scripts/get-vault-password.sh
+	@echo "🪨💎 Nidhi-Nikasha: Testing treasuries on the touchstone..."
+	@for vault in brahmanda kshitiz vyom; do \
+		if [ -f "samsara/ansible/group_vars/$$vault/vault.yml" ]; then \
+			echo "  → Examining $$vault..."; \
+			ansible-vault view "samsara/ansible/group_vars/$$vault/vault.yml" \
+				--vault-password-file=scripts/get-vault-password.sh > /dev/null && \
+			echo "  ✅ $$vault treasury intact"; \
+		else \
+			echo "  ⚠️  No vault found for $$vault (skipping)"; \
+		fi; \
+	done
+	@echo "✅ All treasuries verified and secure"
+
+nidhi-avirbhava:
 	@chmod +x scripts/get-vault-password.sh
 	@if [ -z "$(VAULT)" ]; then \
 		echo "🔓 Decrypting all Ansible Vaults..."; \
@@ -111,11 +142,11 @@ avirbhava:
 				ansible-vault decrypt "samsara/ansible/group_vars/$$vault/vault.yml" --vault-password-file scripts/get-vault-password.sh; \
 			fi; \
 		done; \
-		echo "SUCCESS: All vaults decrypted."; \
+		echo "✅ All treasure repositories manifested successfully"; \
 	else \
-		echo "🔓 Decrypting $(VAULT) vault..."; \
+		echo "💎🔓 Nidhi-Avirbhava: Manifesting $(VAULT) treasury..."; \
 		ansible-vault decrypt "samsara/ansible/group_vars/$(VAULT)/vault.yml" --vault-password-file scripts/get-vault-password.sh; \
-		echo "SUCCESS: $(VAULT) vault decrypted."; \
+		echo "✅ $(VAULT) treasury manifested successfully"; \
 	fi
 
 samshodhana:

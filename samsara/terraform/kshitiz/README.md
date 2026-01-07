@@ -37,11 +37,15 @@ Nebula Mesh Network: 10.42.0.0/16
 
 2. **SSH Key** for accessing Lightsail instance:
 
-   ```bash
-   # Generate if you don't have one
-   ssh-keygen -t ed25519 -f ~/.ssh/kshitiz-lighthouse -C "kshitiz-lighthouse"
+   This key should already exist from completing [vaastu/001-Sarga.md](../../../vaastu/001-Sarga.md) Phase 4 (Pramana).
 
-   # Add to 1Password: "Kshitiz Lighthouse SSH Key"
+   ```bash
+   # Verify key exists
+   ls -la ~/.ssh/kshitiz-lighthouse*
+
+   # Retrieve from 1Password if needed
+   op read "op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key" > ~/.ssh/kshitiz-lighthouse
+   chmod 600 ~/.ssh/kshitiz-lighthouse
    ```
 
 3. **Terraform installed** (via `make install_tools`)

@@ -360,6 +360,34 @@ Generate AWS credentials that will be used by Terraform to provision Lightsail (
 
   > **💡 TIP:** In 1Password, you can easily copy the secret reference path by clicking the **▼** (downward arrow) next to any field and selecting **"Copy Secret Reference"**. This gives you the exact `op://...` path to use in commands and scripts.
 
+- **Generate SSH Key for Lightsail Access:**
+
+  Generate an SSH key pair specifically for accessing the Kshitiz Lightsail instance:
+
+  ```bash
+  ssh-keygen -t ed25519 -f ~/.ssh/kshitiz-lighthouse -C "kshitiz-lighthouse"
+  ```
+
+  **✅ Verification:** Run `ls -la ~/.ssh/kshitiz-lighthouse*`. You should see:
+  - `~/.ssh/kshitiz-lighthouse` (private key)
+  - `~/.ssh/kshitiz-lighthouse.pub` (public key)
+
+  <details>
+  <summary>1Password Storage Instructions</summary>
+
+  **Step 1:** Open 1Password and navigate to the **"Project-Brahmanda"** vault.
+
+  **Step 2:** Create a new **SSH Key** item with these details:
+
+  - **Title:** `Kshitiz-Lighthouse-SSH-Key`
+  - **Private Key field:** Paste the contents of `~/.ssh/kshitiz-lighthouse` (the private key)
+  - **Notes:** "SSH key for accessing Kshitiz Lightsail instance"
+
+  **Step 3:** Save the item. 1Password will automatically extract and display the public key and fingerprint.
+  </details>
+
+  > **💡 NOTE:** This SSH key will be uploaded to Lightsail by Terraform during provisioning. The private key is needed for Ansible to connect later.
+
 ### **Cloudflare Credentials**
 
 Generate Cloudflare credentials for Terraform state and DNS management:

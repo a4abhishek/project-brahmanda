@@ -1,13 +1,16 @@
 # **ADR-003: Hybrid Secret Management Strategy**
 
-Date: 2025-12-31
+Date: 2026-01-07 (Amended from 2025-12-31)
 Status: Accepted
 
 ## **Context**
 
 Project Brahmanda requires the management of highly sensitive credentials (Nebula CA keys, SSH private keys, Cloud API tokens). Since the infrastructure spans multiple environments (MacBook, Windows/WSL, CI/CD pipelines) and manages the network layer itself, relying solely on an online-only secret manager creates a "Connectivity Paradox".
 
-For a detailed discussion and rationale, please see [manthana/RFC-003-Secret-Management.md](../manthana/RFC-003-Secret-Management.md).
+For detailed rationale, see:
+
+- [manthana/RFC-003-Secret-Management.md](../manthana/RFC-003-Secret-Management.md) - Hybrid model foundation
+- [manthana/RFC-006-Automated-Vault-Generation.md](../manthana/RFC-006-Automated-Vault-Generation.md) - Automation enhancement
 
 ## **Decision**
 
@@ -34,17 +37,20 @@ We will adopt a **Hybrid Secret Management** model combining **Ansible Vault** a
 Secrets are distributed across three layers for security and operational efficiency:
 
 **1Password Vault (Project-Brahmanda):**
+
 - AWS Access Key ID and Secret Access Key
 - Cloudflare API Token
 - Ansible Vault Password (the master key to decrypt all Ansible Vaults)
 
 **Ansible Vault (Encrypted in Git):**
+
 - Nebula CA private key (`ca.key`)
 - SSH private keys for nodes
 - K3s cluster tokens
 - Longhorn R2 credentials (access-key-id, secret-access-key, endpoint)
 
 **GitHub Secrets:**
+
 - `OP_SERVICE_ACCOUNT_TOKEN` (the **only** secret stored here)
 
 ### **2. Secret Flow Architecture**
@@ -68,11 +74,14 @@ samsara/
 ├── ansible/
 │   ├── group_vars/
 │   │   ├── brahmanda/    # Global Secrets (Nebula CA, Admin Passwords)
-│   │   │   ├── vault.yml
+│   │   │   ├── vault.tpl.yml  # Template with op:// references
+│   │   │   ├── vault.yml      # Encrypted vault (generated)
 │   │   │   └── vars.yml
 │   │   ├── kshitiz/      # Edge Layer Secrets (Lighthouse)
+│   │   │   ├── vault.tpl.yml
 │   │   │   └── vault.yml
 │   │   └── vyom/         # Compute Layer Secrets (K3s Tokens, Longhorn)
+│   │       ├── vault.tpl.yml
 │   │       └── vault.yml
 ```
 
@@ -101,38 +110,96 @@ Create the following items in the **"Project-Brahmanda"** vault:
    - Create a Service Account with access **scoped only** to the "Project-Brahmanda" vault.
    - Copy the `OP_SERVICE_ACCOUNT_TOKEN` and store it in GitHub Repository Secrets.
 
-### **5. Vault Management Commands**
+### **5. Vault Management**
 
-Use the provided Makefile targets to manage Ansible Vault files:
+**Automated Vault Generation (Recommended - RFC-006):**
 
-- **Encrypt (Tirodhana):** Encrypt the vault file after editing.
+Vault files are **generated** from templates stored in `group_vars/*/vault.tpl.yml`. Templates contain `op://` secret references that are resolved from 1Password.
+
+**Sanskrit Terminology:**
+
+- **Nidhi** (निधि) - "treasure repository" - Generate vaults from 1Password
+- **Pariksha-Nidhi** (परीक्षा-निधि) - "examine treasures" - Verify vault integrity
+- **Tirodhana** (तिरोधान) - "concealment" - Encrypt vaults
+- **Avirbhava** (अविर्भाव) - "manifestation" - Decrypt vaults
+- **Samshodhana** (संशोधन) - "editing" - Modify vaults
+
+**Commands:**
+
+- **Generate All Vaults (Nidhi-Tirodhana):** Regenerate vaults from 1Password templates.
+
   ```bash
-  make tirodhana
+  make nidhi-tirodhana
   ```
 
-- **Decrypt (Avirbhava):** Decrypt the vault file for viewing (use sparingly).
+  This reads all `vault.tpl.yml` files, resolves `op://` references, and creates encrypted `vault.yml` files.
+
+- **Generate Single Vault:** Generate one specific vault.
+
   ```bash
-  make avirbhava
+  make nidhi-tirodhana VAULT=kshitiz  # or vyom, brahmanda
   ```
 
-- **Edit (Samshodhana):** Securely edit the vault file (decrypts in-memory, re-encrypts on save).
+- **Verify Vaults (Nidhi-Nikasha):** Ensure all vaults can be decrypted.
+
+  ```bash
+  make nidhi-nikasha
+  ```
+
+- **Decrypt Vaults (Nidhi-Avirbhava):** For emergency manual inspection.
+
+  ```bash
+  make nidhi-avirbhava  # Decrypts all vaults
+  make nidhi-avirbhava VAULT=kshitiz  # Decrypt specific vault
+  ```
+
+- **Edit (Samshodhana):** Securely edit vault file (decrypts in-memory, re-encrypts on save).
+
   ```bash
   make samshodhana
   ```
 
-All commands automatically fetch the Ansible Vault Password from 1Password using:
-```bash
-op read "op://Project-Brahmanda/Ansible Vault - Samsara/password"
+**Template Example** (`kshitiz/vault.tpl.yml`):
+
+```yaml
+---
+# Kshitiz Ansible Vault
+# Generated from: make nidhi-tirodhana VAULT=kshitiz
+# DO NOT EDIT vault.yml DIRECTLY - Edit this template and regenerate
+
+# SSH Private Key for Kshitiz Lightsail
+ssh_private_key: |
+  op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key
+
+# Nebula Lighthouse Certificates
+nebula_lighthouse_crt: |
+  op://Project-Brahmanda/Nebula-Kshitiz-Lighthouse-Certificate/kshitiz-lighthouse.crt
+
+nebula_lighthouse_key: |
+  op://Project-Brahmanda/Nebula-Kshitiz-Lighthouse-Certificate/kshitiz-lighthouse.key
 ```
+
+**Workflow:**
+
+1. Update secret in 1Password (e.g., rotate SSH key)
+2. Run `make nidhi-tirodhana` to regenerate vaults from templates
+3. Commit encrypted `vault.yml` files to Git
+4. 1Password remains the single source of truth
+
+**Manual Vault Editing (Legacy):**
+
+For backward compatibility, direct vault editing is still supported but discouraged. Always prefer template-based generation.
 
 ### **6. Local Development Workflow**
 
 **Option A: Manual Entry (Offline Mode)**
+
 ```bash
 ansible-playbook setup.yml --ask-vault-pass
 ```
 
 **Option B: Automated (Online Mode using 1Password CLI)**
+
 ```bash
 ansible-playbook setup.yml --vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password")
 ```
@@ -140,6 +207,7 @@ ansible-playbook setup.yml --vault-password-file <(op read "op://Project-Brahman
 ### **7. GitHub Actions Configuration**
 
 **Step 1: Store the Service Account Token**
+
 - Add `OP_SERVICE_ACCOUNT_TOKEN` to GitHub Repository Secrets.
 
 **Step 2: Configure Workflow**
@@ -168,5 +236,18 @@ ansible-playbook setup.yml --vault-password-file <(op read "op://Project-Brahman
 
 ## **Consequences**
 
-- **Positive:** Full offline recovery capability. Secrets are version-controlled with code. Zero-trust regarding where the code is stored.
-- **Negative:** High friction if the Vault Password is lost.
+### **Positive:**
+
+- Full offline recovery capability (vaults in Git, only need vault password)
+- Secrets are version-controlled with code
+- Zero-trust regarding code storage (repo can be public, secrets remain encrypted)
+- **Single source of truth:** 1Password is authoritative, vaults are generated artifacts
+- **Reduced errors:** Template-based generation eliminates copy-paste mistakes
+- **Easy secret rotation:** Update 1Password → `make nidhi-tirodhana` → commit
+- **Auditability:** Templates show structure, Git history shows when vaults changed
+
+### **Negative:**
+
+- High friction if the Vault Password is lost (data unrecoverable)
+- Template maintenance required (keep templates in sync with playbook needs)
+- Learning curve for `op inject` and template syntax

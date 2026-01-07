@@ -75,14 +75,6 @@ brahmanda-infra/
 * **Hardware:** ASUS NUC 14 Pro Plus (Project Vyom).
 * **Software:** 1Password CLI (op), Terraform, Ansible, Make.
 * **Access:** You must have the **Vault Password** stored in your 1Password keychain to decrypt the infrastructure secrets.
-* **SSH Key** for accessing Lightsail instance:
-
-  ```bash
-  # Generate if you don't have one
-  ssh-keygen -t ed25519 -f ~/.ssh/kshitiz-lighthouse -C "kshitiz-lighthouse"
-
-  # Add to 1Password: "Kshitiz Lighthouse SSH Key"
-  ```
 
 ### **Quick Start (The Divine Commands)**
 
