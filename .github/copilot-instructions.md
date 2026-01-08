@@ -153,6 +153,18 @@ Project Brahmanda adheres to the **"Asanga Shastra"** (Weapon of Detachment) - t
 
 ### Learning Documents (vaastu/)
 
+**Learning documents are now centralized in the Anvaya submodule (`vaastu/anvaya/`).**
+
+**How to use Anvaya:**
+- All learning docs for Brahmanda and related projects are stored in `vaastu/anvaya/` (submodule).
+- You can read, edit, and add documents directly in this folder.
+- Changes to Anvaya must be committed and pushed to the Anvaya repository.
+- To update Anvaya after pulling Brahmanda, run:
+  ```sh
+  git submodule update --remote --merge
+  ```
+- Reference Anvaya docs from Brahmanda documentation as needed.
+
 **When creating technology/concept learning documents:**
 - **Structure like a story:** Beginning (what/why) → Middle (how) → End (gotchas/tips)
 - **Efficient and concise:** Save learning time, reduce cognitive load

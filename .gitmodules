@@ -1,0 +1,3 @@
+[submodule "vaastu/anvaya"]
+	path = vaastu/anvaya
+	url = git@github.com:a4abhishek/anvaya.git

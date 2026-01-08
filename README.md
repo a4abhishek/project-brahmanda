@@ -41,6 +41,9 @@ brahmanda-infra/
 │   ├── vidhana/                  # 📜 The Rules & Decisions (Constitutional Law)
 │   │   ├── README.md             # Explains vidhana's purpose
 │   │   └── ADR-XXX...            # Architecture Decision Records
+│   ├── anvaya/                   # 📚 Centralized Learning Documents (submodule)
+│   │   ├── USAGE.md              # How to use the Anvaya submodule
+│   │   └── ...                   # All learning docs (read/write, sync)
 │   └── vivechana/                # 🔍 RCAs (Critical Examination)
 │       └── README.md             # Explains vivechana's purpose
 │
