@@ -1,6 +1,20 @@
+# 1Password Provider Configuration
+provider "onepassword" {
+  # We'll use OP_SERVICE_ACCOUNT_TOKEN environment variable for authentication
+  # This will ensure accessability of 1Password secrets for Terraform as well as op CLI.
+}
+
+data "onepassword_item" "aws_credentials" {
+  # Fetch the onepassword item once to save API calls
+  vault = "Project-Brahmanda"
+  title  = "AWS-samsara-iac"
+}
+
 # AWS Provider Configuration
 provider "aws" {
   region = var.aws_region
+  access_key = data.onepassword_item.aws_credentials.section["Security Credentials"].field["AWS_ACCESS_KEY_ID"].value
+    secret_key = data.onepassword_item.aws_credentials.section["Security Credentials"].field["AWS_SECRET_ACCESS_KEY"].value
 
   # Credentials loaded from environment variables or 1Password
   # AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY

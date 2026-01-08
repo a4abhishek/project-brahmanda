@@ -6,6 +6,9 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
+    onepassword = {
+      source = "1Password/onepassword"
+    }
   }
 
   # Backend configuration (uncomment after first successful apply)

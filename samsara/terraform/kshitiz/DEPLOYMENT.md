@@ -11,20 +11,25 @@ This guide walks through deploying the Kshitiz (Edge Layer) - AWS Lightsail + Ne
 - [ ] 1Password CLI authenticated (`op whoami`)
 - [ ] SSH key generated for Lighthouse access
 
-## Phase 1: Prepare Credentials
+## Phase 1: Prepare Credentials & Environment
 
-### 1. Load AWS Credentials
+### 1. Set 1Password Service Account Token
+
+Before running Terraform, you must export the 1Password Service Account Token. This allows the Terraform provider to authenticate with the 1Password API and fetch the required secrets (like AWS credentials) dynamically.
 
 ```bash
-# Export AWS credentials from 1Password
-export AWS_ACCESS_KEY_ID=$(op read "op://Project-Brahmanda/AWS-samsara-iac/AWS_ACCESS_KEY_ID")
-export AWS_SECRET_ACCESS_KEY=$(op read "op://Project-Brahmanda/AWS-samsara-iac/AWS_SECRET_ACCESS_KEY")
+# Export the Service Account Token from your 1Password "Project-Brahmanda" vault
+export OP_SERVICE_ACCOUNT_TOKEN=$(op read "op://Project-Brahmanda/GitHub-Actions-Token/token")
 
-# Verify credentials work
-aws sts get-caller-identity
+# Verify the token is set (optional)
+echo $OP_SERVICE_ACCOUNT_TOKEN | cut -c 1-10
+# Expected: The first 10 characters of your token
 ```
+*💡 TIP: Add the `export` command to your shell's profile (`.bashrc`, `.zshrc`) to avoid running it in every new terminal session.*
 
-### 2. Generate SSH Key for Lighthouse
+### 2. Generate SSH Key for Lighthouse (If not already done)
+
+This key is used for management access to the Lightsail instance.
 
 ```bash
 # Generate ED25519 key (modern, secure)
@@ -45,7 +50,7 @@ op item create --category="SSH Key" \
 ```bash
 cd samsara/terraform/kshitiz
 
-# Download providers
+# Download providers (including the 1Password provider)
 terraform init
 
 # Verify configuration
@@ -59,10 +64,10 @@ terraform validate
 terraform plan
 
 # Review output:
-# - aws_lightsail_instance.lighthouse
-# - aws_lightsail_static_ip.lighthouse
-# - aws_lightsail_static_ip_attachment.lighthouse
-# - aws_lightsail_instance_public_ports.lighthouse
+# - data.onepassword_item.aws_credentials
+# - aws_lightsail_instance.kshitiz
+# - aws_lightsail_static_ip.kshitiz
+# ... and other resources
 ```
 
 ### 3. Apply Configuration
@@ -113,7 +118,7 @@ ssh -i ~/.ssh/kshitiz-lighthouse ubuntu@$(terraform output -raw public_ip)
 
 # Verify Nebula installed
 nebula -version
-# Expected: Nebula v1.9.5
+# Expected: Nebula v1.10.0 or as per variables.tf
 
 # Check Nebula binaries
 ls -lh /usr/local/bin/nebula*
@@ -162,10 +167,10 @@ ansible kshitiz -i inventory/hosts.yml -m ping
 ansible-playbook -i inventory/hosts.yml playbooks/01-bootstrap-edge.yml
 
 # What it does:
-# 1. Generates Nebula CA and certificates
-# 2. Deploys Lighthouse configuration
-# 3. Creates systemd service
-# 4. Starts Nebula and verifies interface
+# 1. Fetches Nebula CA from 1Password
+# 2. Signs and deploys Lighthouse certificate
+# 3. Deploys Lighthouse configuration file
+# 4. Creates and starts systemd service
 ```
 
 ### 4. Verify Nebula is Running
@@ -193,71 +198,36 @@ exit
 
 ## Phase 5: Retrieve Nebula CA
 
-The Nebula CA certificate is needed to join other nodes to the mesh.
-
-### 1. Download CA Certificate
-
-```bash
-# Copy CA cert to local machine
-scp -i ~/.ssh/kshitiz-lighthouse \
-  ubuntu@$LIGHTHOUSE_IP:/etc/nebula/ca.crt \
-  /tmp/brahmanda-nebula-ca.crt
-
-# View certificate
-nebula-cert print -path /tmp/brahmanda-nebula-ca.crt
-```
-
-### 2. Store CA in 1Password
-
-```bash
-# Save to 1Password for future use
-op document create /tmp/brahmanda-nebula-ca.crt \
-  --title="Brahmanda Nebula CA Certificate" \
-  --vault="Project-Brahmanda" \
-  --tags="nebula,ca,certificate"
-
-# Also save CA key (HIGHLY SENSITIVE)
-scp -i ~/.ssh/kshitiz-lighthouse \
-  ubuntu@$LIGHTHOUSE_IP:/etc/nebula/ca.key \
-  /tmp/brahmanda-nebula-ca.key
-
-op document create /tmp/brahmanda-nebula-ca.key \
-  --title="Brahmanda Nebula CA Private Key" \
-  --vault="Project-Brahmanda" \
-  --tags="nebula,ca,private-key"
-
-# Remove local copies
-rm /tmp/brahmanda-nebula-ca.*
-```
+This phase is now handled entirely by Ansible and 1Password. The CA certificate is stored securely in 1Password and fetched by Ansible as needed, so manual retrieval is no longer necessary.
 
 ## Verification Checklist
 
 - [ ] AWS Lightsail instance running
 - [ ] Static IP attached
 - [ ] Firewall rules configured (SSH, Nebula, HTTPS)
+- [ ] Terraform successfully fetched credentials from 1Password
 - [ ] SSH access works with key
-- [ ] Nebula binary installed (`nebula -version`)
-- [ ] Nebula CA generated
+- [ ] Ansible successfully configured the instance
 - [ ] Nebula service running (`systemctl status nebula`)
 - [ ] Nebula interface up (`ip addr show nebula1`)
-- [ ] Nebula listening on UDP 4242
-- [ ] Prometheus metrics accessible
-- [ ] CA certificate stored in 1Password
 
 ## Common Issues
 
-### Issue: Terraform fails with AWS credentials
+### Issue: Terraform fails with a 1Password authentication error
 
 ```bash
-# Error: "NoCredentialProviders: no valid providers in chain"
+# Error: "failed to get service account: 1password-cli desktop integration is not available"
+# OR
+# Error: "No OP_SERVICE_ACCOUNT_TOKEN environment variable set"
 
-# Solution: Verify credentials exported
-echo $AWS_ACCESS_KEY_ID
-echo $AWS_SECRET_ACCESS_KEY
+# Solution: Verify the service account token is exported correctly.
+echo $OP_SERVICE_ACCOUNT_TOKEN
 
 # Re-export if needed
-export AWS_ACCESS_KEY_ID=$(op read "op://Project-Brahmanda/AWS-samsara-iac/AWS_ACCESS_KEY_ID")
-export AWS_SECRET_ACCESS_KEY=$(op read "op://Project-Brahmanda/AWS-samsara-iac/AWS_SECRET_ACCESS_KEY")
+export OP_SERVICE_ACCOUNT_TOKEN=$(op read "op://Project-Brahmanda/GitHub-Actions-Token/token")
+
+# Ensure you have also run `op signin` at least once.
+op whoami
 ```
 
 ### Issue: SSH connection refused
@@ -266,7 +236,8 @@ export AWS_SECRET_ACCESS_KEY=$(op read "op://Project-Brahmanda/AWS-samsara-iac/A
 # Wait for cloud-init to complete
 # Takes 2-3 minutes after instance creation
 
-# Check instance console output
+# Check instance console output from the AWS Management Console
+# or via the AWS CLI:
 aws lightsail get-instance-console-output --instance-name kshitiz-lighthouse
 ```
 
@@ -276,28 +247,28 @@ aws lightsail get-instance-console-output --instance-name kshitiz-lighthouse
 # Verify SSH key path
 ls -l ~/.ssh/kshitiz-lighthouse
 
-# Test manual SSH
-ssh -i ~/.ssh/kshitiz-lighthouse -v ubuntu@$LIGHTHOUSE_IP
+# Test manual SSH with verbose output
+ssh -i ~/.ssh/kshitiz-lighthouse -v ubuntu@$(terraform output -raw public_ip)
 
-# Check inventory file has correct IP
-cat inventory/hosts.yml | grep ansible_host
+# Check inventory file has the correct IP
+cat samsara/ansible/inventory/hosts.yml | grep ansible_host
 ```
 
 ### Issue: Nebula service fails to start
 
 ```bash
-# SSH to instance
-ssh -i ~/.ssh/kshitiz-lighthouse ubuntu@$LIGHTHOUSE_IP
+# SSH into instance
+ssh -i ~/.ssh/kshitiz-lighthouse ubuntu@$(terraform output -raw public_ip)
 
-# Check service logs
+# Check service logs for errors
 sudo journalctl -u nebula -n 50
 
 # Common issues:
-# - Missing certificates (check /etc/nebula/)
-# - Config syntax error (validate config.yml)
-# - Port already in use (check netstat)
+# - Missing certificates (check /etc/nebula/) -> Did Ansible run correctly?
+# - Config syntax error (validate Ansible-generated config.yml)
+# - Port already in use (check `sudo netstat -ulnp`)
 
-# Restart service
+# Restart service after fixing
 sudo systemctl restart nebula
 ```
 
@@ -311,13 +282,11 @@ sudo systemctl restart nebula
 
 ## Next Steps
 
-After successful Kshitiz deployment:
+After successful Kshitiz deployment and Ansible configuration:
 
-1. **Create Vyom VMs** - Proxmox VMs for K3s cluster
-2. **Join Vyom to mesh** - Issue Nebula certificates for compute nodes
-3. **Test mesh connectivity** - Ping between Kshitiz and Vyom
-4. **Deploy K3s** - Kubernetes cluster on Vyom nodes
-5. **Configure ingress** - Route external traffic through Kshitiz
+1. Create Vyom VMs and join them to the Nebula mesh.
+2. Deploy the K3s Kubernetes cluster.
+3. Configure Ingress to route traffic from Kshitiz to services in Vyom.
 
 See `vaastu/002-Visarga.md` for operational procedures.
 
@@ -328,19 +297,18 @@ To destroy all Kshitiz resources:
 ```bash
 cd samsara/terraform/kshitiz
 
+# Ensure OP_SERVICE_ACCOUNT_TOKEN is set
+export OP_SERVICE_ACCOUNT_TOKEN=$(op read "op://Project-Brahmanda/GitHub-Actions-Token/token")
+
 # Destroy infrastructure
 terraform destroy
 
 # Type 'yes' to confirm
-
-# Verify cleanup
-aws lightsail get-instances --query "instances[?name=='kshitiz-lighthouse']"
-# Expected: empty list
 ```
 
 ## References
 
-- [AWS Lightsail](https://docs.aws.amazon.com/lightsail/)
+- [1Password Terraform Provider](https://registry.terraform.io/providers/1Password/onepassword/latest/docs)
+- [AWS Lightsail Documentation](https://docs.aws.amazon.com/lightsail/)
 - [Nebula Documentation](https://nebula.defined.net/docs/)
-- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
-- [RFC-001: Homelab Architecture](../../vaastu/manthana/RFC-001-Homelab-Architecture.md)
+- [RFC-007: Terraform Secret Management](../../vaastu/manthana/RFC-007-Terraform-Secret-Management.md)

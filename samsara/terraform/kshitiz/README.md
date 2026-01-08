@@ -28,27 +28,28 @@ Nebula Mesh Network: 10.42.0.0/16
 
 ## Prerequisites
 
-1. **AWS Credentials** (stored in 1Password):
+1. **1Password Authentication**:
+   - The Terraform 1Password provider authenticates using a service account token. Before running any `terraform` commands, ensure this token is exported as an environment variable.
+   - You must also be signed into the 1Password CLI (`op signin`).
 
    ```bash
-   export AWS_ACCESS_KEY_ID=$(op read "op://Project-Brahmanda/AWS-samsara-iac/AWS_ACCESS_KEY_ID")
-   export AWS_SECRET_ACCESS_KEY=$(op read "op://Project-Brahmanda/AWS-samsara-iac/AWS_SECRET_ACCESS_KEY")
+   export OP_SERVICE_ACCOUNT_TOKEN=$(op read "op://Project-Brahmanda/GitHub-Actions-Token/token")
    ```
 
-2. **SSH Key** for accessing Lightsail instance:
-
-   This key should already exist from completing [vaastu/001-Sarga.md](../../../vaastu/001-Sarga.md) Phase 4 (Pramana).
+2. **SSH Key** for accessing the Lightsail instance:
+   - This key should already exist from completing the prerequisite steps in the main project setup. You can verify its existence or retrieve it from 1Password if needed.
 
    ```bash
    # Verify key exists
    ls -la ~/.ssh/kshitiz-lighthouse*
 
-   # Retrieve from 1Password if needed
-   op read "op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key" > ~/.ssh/kshitiz-lighthouse
-   chmod 600 ~/.ssh/kshitiz-lighthouse
+   # Or, retrieve from 1Password if it's missing
+   # op read "op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key" > ~/.ssh/kshitiz-lighthouse
+   # chmod 600 ~/.ssh/kshitiz-lighthouse
    ```
 
-3. **Terraform installed** (via `make install_tools`)
+3. **Terraform Installed**:
+   - Ensure Terraform is installed, typically via `make install_tools` from the project root.
 
 ## Usage
 
