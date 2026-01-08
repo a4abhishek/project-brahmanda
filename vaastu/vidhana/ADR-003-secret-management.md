@@ -1,253 +1,133 @@
 # **ADR-003: Hybrid Secret Management Strategy**
 
-Date: 2026-01-07 (Amended from 2025-12-31)
-Status: Accepted
+**Date:** 2026-01-08 (Amended from 2025-12-31)
+**Status:** Accepted
 
 ## **Context**
 
-Project Brahmanda requires the management of highly sensitive credentials (Nebula CA keys, SSH private keys, Cloud API tokens). Since the infrastructure spans multiple environments (MacBook, Windows/WSL, CI/CD pipelines) and manages the network layer itself, relying solely on an online-only secret manager creates a "Connectivity Paradox".
+Project Brahmanda requires the management of highly sensitive credentials (Nebula CA keys, SSH private keys, Cloud API tokens). Since the infrastructure spans multiple environments (MacBook, Windows/WSL, CI/CD pipelines) and manages the network layer itself, relying solely on an online-only secret manager creates a **"Connectivity Paradox"**: you cannot fetch the keys to fix the network if the network itself is down.
+
+We need a strategy that provides:
+
+1. **Single Source of Truth (SSOT):** 1Password as the authoritative hub.
+2. **Declarative Provisioning:** Terraform must explicitly declare its secret dependencies.
+3. **Offline Resilience:** Ansible must be able to configure nodes even during a "Lighthouse" outage.
 
 For detailed rationale, see:
 
 - [manthana/RFC-003-Secret-Management.md](../manthana/RFC-003-Secret-Management.md) - Hybrid model foundation
-- [manthana/RFC-006-Automated-Vault-Generation.md](../manthana/RFC-006-Automated-Vault-Generation.md) - Automation enhancement
+- [manthana/RFC-006-Automated-Vault-Generation.md](../manthana/RFC-006-Automated-Vault-Generation.md) - Secret enhancement for Ansible
+- [manthana/RFC-007-Terraform-Secret-Management](../manthana/RFC-007-Terraform-Secret-Management.md) - Secret enhancement for Terraform
 
 ## **Decision**
 
-We will adopt a **Hybrid Secret Management** model combining **Ansible Vault** and **1Password**.
+We will adopt a **Dual-Mode Hybrid Secret Management** model.
 
-### **1. The Storage Layer (Ansible Vault)**
+### **1\. Provisioning Mode (Terraform \+ 1Password Provider)**
 
-- All infrastructure secrets (SSH keys, API tokens, Certificates) **MUST** be stored encrypted at rest within the Git repository using **Ansible Vault**.
-- Secrets **MUST** be scoped by domain using the "Scoped Files, Single Key" pattern:
-  - `group_vars/brahmanda/vault.yml`: Global secrets (Nebula CA).
-  - `group_vars/kshitiz/vault.yml`: Edge secrets.
-  - `group_vars/vyom/vault.yml`: Compute secrets.
+For infrastructure provisioning (AWS, Cloudflare, Proxmox), Terraform will use the **official 1Password Provider**. Secrets will be fetched declaratively during the plan and apply phases. This eliminates the need for manual export of environment variables and prevents secret leakage in shell histories.
 
-### **2. The Access Layer (1Password)**
+### **2\. Configuration Mode (Ansible \+ Scoped Vaults)**
 
-- The **Ansible Vault Password** and cloud provider root credentials **MUST** be stored in a dedicated 1Password Vault named **"Project-Brahmanda"**.
-- They **MUST NOT** be stored in the user's "Private" vault to ensure isolation and least-privilege access for Service Accounts.
-- The Vault Password **MUST NEVER** be committed to Git in plain text.
+For node configuration (Nebula, K3s, Hardening), we will use **Ansible Vault** encrypted at rest in Git. These vaults are generated from templates that reference 1Password. This preserves the **"Asanga Shastra"** (Detachment) principle, allowing for offline disaster recovery.
 
 ## **Implementation**
 
-### **1. Secret Distribution Strategy**
+### **1\. Secret Distribution Strategy**
 
-Secrets are distributed across three layers for security and operational efficiency:
+| Layer | Tool | Source | Use Case |
+| :---- | :---- | :---- | :---- |
+| **Authoritative** | 1Password | Project-Brahmanda Vault | SSOT for all keys, tokens, and passwords. |
+| **Provisioning** | Terraform | onepassword Provider | Dynamic injection into AWS, Cloudflare, and Proxmox providers. |
+| **Configuration** | Ansible | Scoped vault.yml | Encrypted-in-Git secrets for mesh and cluster setup. |
+| **CI/CD** | GitHub Actions | OP\_SERVICE\_ACCOUNT\_TOKEN | The single bootstrap secret required to unlock the universe. |
 
-**1Password Vault (Project-Brahmanda):**
+### **2\. Secret Flow Architecture**
 
-- AWS Access Key ID and Secret Access Key
-- Cloudflare API Token
-- Ansible Vault Password (the master key to decrypt all Ansible Vaults)
-
-**Ansible Vault (Encrypted in Git):**
-
-- Nebula CA private key (`ca.key`)
-- SSH private keys for nodes
-- K3s cluster tokens
-- Longhorn R2 credentials (access-key-id, secret-access-key, endpoint)
-
-**GitHub Secrets:**
-
-- `OP_SERVICE_ACCOUNT_TOKEN` (the **only** secret stored here)
-
-### **2. Secret Flow Architecture**
-
-```text
-GitHub Actions
-    ↓ (uses OP_SERVICE_ACCOUNT_TOKEN)
-1Password (Project-Brahmanda Vault)
-    ↓ (fetches AWS, Cloudflare, Ansible Vault Password)
-Terraform & Ansible
-    ↓ (uses Ansible Vault Password to decrypt)
-Ansible Vault Files
-    ↓ (provides infrastructure secrets)
-Provisioning
+```
+       1Password (Project-Brahmanda Vault)
+                 │
+        ┌────────┴────────┐
+        ▼                 ▼
+   Terraform          Ansible Vault
+ (Direct API)       (Template Generation)
+        │                 │
+        ▼                 ▼
+  Provisioning       Configuration
+(Cloud/VMs/IPs)     (Mesh/K3s/Secrets)
 ```
 
-### **3. Directory Structure**
+### **3\. Terraform Integration (RFC-007)**
 
-```text
-samsara/
-├── ansible/
-│   ├── group_vars/
-│   │   ├── brahmanda/    # Global Secrets (Nebula CA, Admin Passwords)
-│   │   │   ├── vault.tpl.yml  # Template with op:// references
-│   │   │   ├── vault.yml      # Encrypted vault (generated)
-│   │   │   └── vars.yml
-│   │   ├── kshitiz/      # Edge Layer Secrets (Lighthouse)
-│   │   │   ├── vault.tpl.yml
-│   │   │   └── vault.yml
-│   │   └── vyom/         # Compute Layer Secrets (K3s Tokens, Longhorn)
-│   │       ├── vault.tpl.yml
-│   │       └── vault.yml
-```
+Terraform configurations **MUST** use the onepassword\_item data source.
 
-### **4. 1Password Setup**
+\# Example: samsara/terraform/kshitiz/main.tf
 
-Create the following items in the **"Project-Brahmanda"** vault:
+data "onepassword\_item" "aws\_creds" {
+  vault \= "Project-Brahmanda"
+  title \= "AWS-samsara-iac"
+}
 
-1. **AWS Credentials:**
-   - Type: Login or API Credential
-   - Item Name: `AWS-samsara-iac`
-   - Fields:
-     - `Security Credentials/AWS_ACCESS_KEY_ID`
-     - `Security Credentials/AWS_ACCESS_KEY_SECRET`
+provider "aws" {
+  access\_key \= data.onepassword\_item.aws\_creds.username
+  secret\_key \= data.onepassword\_item.aws\_creds.password
+}
 
-2. **Cloudflare API Token:**
-   - Type: API Credential
-   - Item Name: `Cloudflare`
-   - Field: `api-token`
+### **4\. Ansible Vault Management (Nidhi Framework)**
 
-3. **Ansible Vault Password:**
-   - Type: Password
-   - Item Name: `Ansible Vault - Samsara`
-   - Field: `password`
+We use the **Nidhi** (Treasure) framework to manage Ansible secrets. Vaults are artifacts generated from templates.
 
-4. **1Password Service Account:**
-   - Create a Service Account with access **scoped only** to the "Project-Brahmanda" vault.
-   - Copy the `OP_SERVICE_ACCOUNT_TOKEN` and store it in GitHub Repository Secrets.
+- Nidhi-Tirodhana (Concealment): make nidhi-tirodhana
+  Generates encrypted vault.yml from vault.tpl.yml by resolving op:// references.
+- Nidhi-Avirbhava (Manifestation): make nidhi-avirbhava
+  Decrypts vaults for emergency manual inspection.
+- Samshodhana (Refinement): make samshodhana
+  Securely edits a vault in-memory.
 
-### **5. Vault Management**
+### **5\. 1Password Vault Items**
 
-**Automated Vault Generation (Recommended - RFC-006):**
+The **"Project-Brahmanda"** vault must contain:
 
-Vault files are **generated** from templates stored in `group_vars/*/vault.tpl.yml`. Templates contain `op://` secret references that are resolved from 1Password.
+1. **AWS-samsara-iac:** Login item (Access Key/Secret).
+2. **Cloudflare:** API Credential (Token/Account ID).
+3. **Ansible Vault \- Samsara:** Password for Git-encrypted files.
+4. **Infrastructure SSH Keys:** Private/Public keys for node access.
 
-**Sanskrit Terminology:**
+## **Local & CI/CD Workflow**
 
-- **Nidhi** (निधि) - "treasure repository" - Generate vaults from 1Password
-- **Pariksha-Nidhi** (परीक्षा-निधि) - "examine treasures" - Verify vault integrity
-- **Tirodhana** (तिरोधान) - "concealment" - Encrypt vaults
-- **Avirbhava** (अविर्भाव) - "manifestation" - Decrypt vaults
-- **Samshodhana** (संशोधन) - "editing" - Modify vaults
+### **Local Development**
 
-**Commands:**
+Before running any automation, ensure the Service Account token is active:
 
-- **Generate All Vaults (Nidhi-Tirodhana):** Regenerate vaults from 1Password templates.
+export OP\_SERVICE\_ACCOUNT\_TOKEN=$(op read "op://Project-Brahmanda/Service-Account/token")
+make srishti
 
-  ```bash
-  make nidhi-tirodhana
-  ```
+### **GitHub Actions**
 
-  This reads all `vault.tpl.yml` files, resolves `op://` references, and creates encrypted `vault.yml` files.
+The pipeline uses the 1Password Load Secrets action to bridge the gap.
 
-- **Generate Single Vault:** Generate one specific vault.
-
-  ```bash
-  make nidhi-tirodhana VAULT=kshitiz  # or vyom, brahmanda
-  ```
-
-- **Verify Vaults (Nidhi-Nikasha):** Ensure all vaults can be decrypted.
-
-  ```bash
-  make nidhi-nikasha
-  ```
-
-- **Decrypt Vaults (Nidhi-Avirbhava):** For emergency manual inspection.
-
-  ```bash
-  make nidhi-avirbhava  # Decrypts all vaults
-  make nidhi-avirbhava VAULT=kshitiz  # Decrypt specific vault
-  ```
-
-- **Edit (Samshodhana):** Securely edit vault file (decrypts in-memory, re-encrypts on save).
-
-  ```bash
-  make samshodhana
-  ```
-
-**Template Example** (`kshitiz/vault.tpl.yml`):
-
-```yaml
----
-# Kshitiz Ansible Vault
-# Generated from: make nidhi-tirodhana VAULT=kshitiz
-# DO NOT EDIT vault.yml DIRECTLY - Edit this template and regenerate
-
-# SSH Private Key for Kshitiz Lightsail
-ssh_private_key: |
-  op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key
-
-# Nebula Lighthouse Certificates
-nebula_lighthouse_crt: |
-  op://Project-Brahmanda/Nebula-Kshitiz-Lighthouse-Certificate/kshitiz-lighthouse.crt
-
-nebula_lighthouse_key: |
-  op://Project-Brahmanda/Nebula-Kshitiz-Lighthouse-Certificate/kshitiz-lighthouse.key
-```
-
-**Workflow:**
-
-1. Update secret in 1Password (e.g., rotate SSH key)
-2. Run `make nidhi-tirodhana` to regenerate vaults from templates
-3. Commit encrypted `vault.yml` files to Git
-4. 1Password remains the single source of truth
-
-**Manual Vault Editing (Legacy):**
-
-For backward compatibility, direct vault editing is still supported but discouraged. Always prefer template-based generation.
-
-### **6. Local Development Workflow**
-
-**Option A: Manual Entry (Offline Mode)**
-
-```bash
-ansible-playbook setup.yml --ask-vault-pass
-```
-
-**Option B: Automated (Online Mode using 1Password CLI)**
-
-```bash
-ansible-playbook setup.yml --vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password")
-```
-
-### **7. GitHub Actions Configuration**
-
-**Step 1: Store the Service Account Token**
-
-- Add `OP_SERVICE_ACCOUNT_TOKEN` to GitHub Repository Secrets.
-
-**Step 2: Configure Workflow**
-
-```yaml
-- name: Load secrets from 1Password
+\- name: Load Secrets
   uses: 1password/load-secrets-action@v1
-  env:
-    OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
   with:
-    export-env: false
-    export: |
-      AWS_ACCESS_KEY_ID=op://Project-Brahmanda/AWS-samsara-iac/Security Credentials/AWS_ACCESS_KEY_ID
-      AWS_SECRET_ACCESS_KEY=op://Project-Brahmanda/AWS-samsara-iac/Security Credentials/AWS_ACCESS_KEY_SECRET
-      CLOUDFLARE_API_TOKEN=op://Project-Brahmanda/Cloudflare/api-token
-      ANSIBLE_VAULT_PASSWORD=op://Project-Brahmanda/Ansible Vault - Samsara/password
-
-- name: Run Ansible Playbook
-  run: |
-    echo "$ANSIBLE_VAULT_PASSWORD" > .vault_pass
-    ansible-playbook site.yml --vault-password-file .vault_pass
-    rm .vault_pass
+    export-env: true
   env:
-    ANSIBLE_VAULT_PASSWORD: ${{ env.ANSIBLE_VAULT_PASSWORD }}
-```
+    OP\_SERVICE\_ACCOUNT\_TOKEN: ${{ secrets.OP\_SERVICE\_ACCOUNT\_TOKEN }}
+    ANSIBLE\_VAULT\_PASSWORD: op://Project-Brahmanda/Ansible Vault \- Samsara/password
 
 ## **Consequences**
 
-### **Positive:**
+### **Positive**
 
-- Full offline recovery capability (vaults in Git, only need vault password)
-- Secrets are version-controlled with code
-- Zero-trust regarding code storage (repo can be public, secrets remain encrypted)
-- **Single source of truth:** 1Password is authoritative, vaults are generated artifacts
-- **Reduced errors:** Template-based generation eliminates copy-paste mistakes
-- **Easy secret rotation:** Update 1Password → `make nidhi-tirodhana` → commit
-- **Auditability:** Templates show structure, Git history shows when vaults changed
+- ✅ **Declarative Dependency:** Terraform code now explicitly shows what secrets it requires.
+- ✅ **Security:** No plaintext secrets exist in shell environments or .tfvars files.
+- ✅ **Offline Resilience:** Ansible Vaults in Git allow for recovery even if 1Password is unreachable (provided the Vault Password is known).
+- ✅ **Zero-Trust:** The repository can be public; all sensitive material is encrypted or referenced via op:// URIs.
 
-### **Negative:**
+### **Negative**
 
-- High friction if the Vault Password is lost (data unrecoverable)
-- Template maintenance required (keep templates in sync with playbook needs)
-- Learning curve for `op inject` and template syntax
+- ⚠️ **Provider Overhead:** Adds a dependency on the 1Password/onepassword Terraform provider.
+- ⚠️ **Sync Requirement:** Developers must remember to run make nidhi-tirodhana if templates are changed.
+
+## **Conclusion**
+
+By integrating the 1Password Terraform Provider, we close the gap between provisioning and configuration. We have achieved a state where our code is declarative, our secrets are central, and our infrastructure is truly **detached** (Asanga) yet **recoverable**.
