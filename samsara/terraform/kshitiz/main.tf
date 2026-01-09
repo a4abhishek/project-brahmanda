@@ -10,11 +10,19 @@ data "onepassword_item" "aws_credentials" {
   title  = "AWS-samsara-iac"
 }
 
+locals {
+  # Extract fields from the "Security Credentials" section
+  aws_creds_fields = flatten([
+    for s in data.onepassword_item.aws_credentials.section : s.field
+    if s.label == "Security Credentials"
+  ])
+}
+
 # AWS Provider Configuration
 provider "aws" {
-  region = var.aws_region
-  access_key = data.onepassword_item.aws_credentials.section["Security Credentials"].field["AWS_ACCESS_KEY_ID"].value
-    secret_key = data.onepassword_item.aws_credentials.section["Security Credentials"].field["AWS_SECRET_ACCESS_KEY"].value
+  region     = var.aws_region
+  access_key = one([for f in local.aws_creds_fields : f.value if f.label == "AWS_ACCESS_KEY_ID"])
+  secret_key = one([for f in local.aws_creds_fields : f.value if f.label == "AWS_SECRET_ACCESS_KEY"])
 
   # Credentials loaded from environment variables or 1Password
   # AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
