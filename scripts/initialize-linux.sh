@@ -228,25 +228,81 @@ configure_pipx_path() {
 
 # Install Ansible via pipx
 install_ansible() {
-  info "Installing Ansible via pipx..."
-  
-  if pipx list 2>/dev/null | grep -qE '(^| )(ansible|ansible-core)($| )'; then
-    info "Ansible already installed via pipx, skipping"
-    
-    # Verify ansible binary is accessible
-    command_exists ansible || die "Ansible binary not found in PATH after pipx installation"
+  info "Checking for Ansible..."
+
+  hash -r  # Clear the bash cache before checking
+
+  # If binary exists AND is managed by pipx, we are good
+  if command_exists ansible && pipx list | grep -qE 'package (ansible|ansible-core)'; then
+    success "Ansible already correctly installed via pipx"
     return 0
   fi
-  
-  # Try ansible first, fall back to ansible-core if it fails
-  if ! pipx install ansible 2>/dev/null; then
-    info "Failed to install 'ansible' package, trying 'ansible-core' instead"
-    pipx install ansible-core
+
+  # If binary is missing but pipx thinks it is there, force a reinstall
+  if pipx list | grep -qE 'package (ansible|ansible-core)'; then
+    info "Repairing broken pipx installation..."
+    pipx reinstall ansible || pipx reinstall ansible-core
+  else
+    info "Installing Ansible via pipx..."
+    # Primary install attempt
+    pipx install --include-deps --force ansible 2>/dev/null || pipx install ansible-core
   fi
-  
-  # Verify ansible binary is accessible
+
   command_exists ansible || die "Ansible binary not found after installation"
   success "Ansible installed via pipx"
+}
+
+# Install Ansible Lint via pipx
+install_ansible_lint() {
+  info "Checking for Ansible Lint..."
+
+  hash -r  # Clear the bash cache before checking
+
+  # If binary exists AND is managed by pipx, we are good
+  if command_exists ansible-lint && pipx list | grep -qE 'package (ansible-lint)'; then
+    success "Ansible Lint already correctly installed via pipx"
+    return 0
+  fi
+
+  # If binary is missing but pipx thinks it is there, force a reinstall
+  if pipx list | grep -qE 'package (ansible-lint)'; then
+    info "Repairing broken pipx installation..."
+    pipx reinstall ansible-lint
+  else
+    info "Installing Ansible Lint via pipx..."
+    # Primary install attempt
+    pipx install --include-deps --force ansible-lint
+  fi
+
+  command_exists ansible-lint || die "Ansible Lint binary not found after installation"
+  success "Ansible Lint installed via pipx"
+}
+
+# Install Ansible Dev Tools via pipx
+install_ansible_dev_tools() {
+  info "Checking for Ansible Dev Tools..."
+
+  # If binary exists AND is managed by pipx, we are good
+  if adt --version 2>/dev/null | grep -q "ansible-dev-tools"; then
+    success "Ansible Dev Tools already correctly installed via pipx"
+    return 0
+  fi
+
+  # If binary is missing but pipx thinks it is there, force a reinstall
+  if pipx list | grep -qE 'package (ansible-dev-tools)'; then
+    info "Repairing broken pipx installation..."
+    pipx reinstall ansible-dev-tools
+  else
+    info "Installing Ansible Dev Tools via pipx..."
+    # Primary install attempt
+    pipx install --include-deps --force ansible-dev-tools
+  fi
+
+  if ! adt --version 2>/dev/null | grep -q "ansible-dev-tools"; then
+    die "Ansible Dev Tools binary not found after installation"
+  fi
+
+  success "Ansible Dev Tools installed via pipx"
 }
 
 # Install Proxmox Auto-Install Assistant
@@ -308,6 +364,8 @@ main() {
   install_main_tools
   configure_pipx_path
   install_ansible
+  install_ansible_lint
+  install_ansible_dev_tools
   install_proxmox_assistant
   install_dasel
   install_filesystem_tools

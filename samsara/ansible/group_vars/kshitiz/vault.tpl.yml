@@ -1,0 +1,23 @@
+---
+# Kshitiz Ansible Vault Template
+# Generated from: make nidhi-tirodhana VAULT=kshitiz
+# DO NOT EDIT vault.yml DIRECTLY - Edit this template and regenerate
+#
+# This template uses 1Password secret references (op: //)
+# Run `make nidhi-tirodhana VAULT=kshitiz` to generate the encrypted vault.yml
+
+# SSH Private Key for Kshitiz Lightsail Instance
+ssh_private_key: |
+  op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key
+
+# Nebula CA Certificate (Public) - Required by all nodes to verify others
+nebula_ca_crt: |
+  op://Project-Brahmanda/Nebula-CA-Root-Certificate/ca.crt
+
+# Nebula Lighthouse Certificate
+nebula_lighthouse_crt: |
+  op://Project-Brahmanda/Nebula-Kshitiz-Lighthouse-Certificate/kshitiz-lighthouse.crt
+
+# Nebula Lighthouse Private Key
+nebula_lighthouse_key: |
+  op://Project-Brahmanda/Nebula-Kshitiz-Lighthouse-Certificate/kshitiz-lighthouse.key

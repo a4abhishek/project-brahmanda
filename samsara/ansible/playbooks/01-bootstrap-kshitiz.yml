@@ -1,0 +1,91 @@
+---
+- name: Bootstrap Kshitiz (Edge) Lighthouse
+  hosts: kshitiz
+  become: true  # This tells Ansible to use 'sudo' for the tasks.
+  # The 'vars_files' section is commented out because Ansible automatically
+  # loads variables from 'group_vars/kshitiz/'. The 'vault.yml' file will be
+  # loaded automatically.
+  # vars_files:
+  #   - ../group_vars/kshitiz/vars.yml
+  #   - ../group_vars/kshitiz/vault.yml
+
+  tasks:
+    - name: 📂 Create Nebula configuration directory
+      ansible.builtin.file:
+        path: /etc/nebula
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: 📜 Deploy Nebula CA certificate
+      # This copies the public CA cert to the server.
+      # The content comes from the 'nebula_ca_crt' variable in your vault.
+      ansible.builtin.copy:
+        content: "{{ nebula_ca_crt }}"
+        dest: /etc/nebula/ca.crt
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: 📜 Deploy Nebula Lighthouse certificate
+      # This copies the lighthouse's own public certificate.
+      ansible.builtin.copy:
+        content: "{{ nebula_lighthouse_crt }}"
+        dest: /etc/nebula/lighthouse.crt
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: 🔑 Deploy Nebula Lighthouse private key
+      # This copies the lighthouse's private key. Note the stricter permissions.
+      ansible.builtin.copy:
+        content: "{{ nebula_lighthouse_key }}"
+        dest: /etc/nebula/lighthouse.key
+        owner: root
+        group: root
+        mode: '0600'  # Only root can read this file.
+
+    - name: 📜 Deploy Nebula Lighthouse configuration file
+      # This creates the main config file for Nebula.
+      ansible.builtin.template:
+        src: ../templates/nebula-lighthouse-config.yml.j2
+        dest: /etc/nebula/config.yml
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart Nebula # This tells Ansible to run the "Restart Nebula" handler if this file changes.
+
+    - name: ⚙️ Deploy Nebula systemd service unit file
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/nebula.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Nebula Overlay Network Service
+          Wants=network-online.target
+          After=network-online.target
+          [Service]
+          ExecStart=/usr/local/bin/nebula -config /etc/nebula/config.yml
+          Restart=always
+          RestartSec=10
+          KillMode=process
+          [Install]
+          WantedBy=multi-user.target
+      notify: Reload systemd # Tell systemd to re-read its config
+
+    - name: ☑️ Enable and start Nebula service
+      ansible.builtin.systemd:
+        name: nebula
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: 🔄️ Restart Nebula
+      ansible.builtin.systemd:
+        name: nebula
+        state: restarted

@@ -130,86 +130,78 @@ exit
 
 ## Phase 4: Configure with Ansible
 
+With the infrastructure provisioned by Terraform, the next step is to run the Ansible playbook to configure the instance as a Nebula lighthouse.
+
 ### 1. Update Ansible Inventory
 
+First, provide the dynamic IP address of your new instance to Ansible's inventory.
+
 ```bash
-# Get Lighthouse public IP
-LIGHTHOUSE_IP=$(cd samsara/terraform/kshitiz && terraform output -raw public_ip)
+# Navigate to the kshitiz terraform directory
+cd samsara/terraform/kshitiz
 
-# Update inventory
-cd samsara/ansible
+# Get the public IP output from your terraform state
+LIGHTHOUSE_IP=$(terraform output -raw public_ip)
 
-# Edit inventory/hosts.yml
-# Replace REPLACE_WITH_TERRAFORM_OUTPUT with $LIGHTHOUSE_IP
-sed -i "s/REPLACE_WITH_TERRAFORM_OUTPUT/$LIGHTHOUSE_IP/" inventory/hosts.yml
+# Navigate to the ansible directory
+cd ../../ansible
 
-# Or manually edit:
-vim inventory/hosts.yml
+# Use 'sed' to replace the placeholder in the inventory file.
+# This is a temporary manual step. See RFC-008 for future automation.
+sed -i "s/REPLACE_WITH_TERRAFORM_OUTPUT/$$LIGHTHOUSE_IP/" inventory/hosts.yml
+
+echo "INFO: Inventory updated with IP: $$LIGHTHOUSE_IP"
 ```
 
-### 2. Test Ansible Connectivity
+### 2. Run the Bootstrap Playbook
+
+Now, run the playbook to configure the server. This will copy the Nebula certificates from your vault and set up the service.
 
 ```bash
-# Ping Lighthouse
-ansible kshitiz -i inventory/hosts.yml -m ping
+# From the 'samsara/ansible' directory
 
-# Expected output:
-# kshitiz-lighthouse | SUCCESS => {
-#     "changed": false,
-#     "ping": "pong"
-# }
+# First, test connectivity to the host
+ansible kshitiz -m ping
+
+# Expected output: "ping": "pong"
+
+# Run the playbook. Use the vault password from 1Password.
+ansible-playbook playbooks/01-bootstrap-kshitiz.yml --vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password")
 ```
 
-### 3. Run Bootstrap Playbook
+### 3. Verify Nebula is Running
+
+After the playbook succeeds, you can SSH into the server to verify Nebula is running correctly.
 
 ```bash
-# Configure Nebula Lighthouse
-ansible-playbook -i inventory/hosts.yml playbooks/01-bootstrap-edge.yml
-
-# What it does:
-# 1. Fetches Nebula CA from 1Password
-# 2. Signs and deploys Lighthouse certificate
-# 3. Deploys Lighthouse configuration file
-# 4. Creates and starts systemd service
-```
-
-### 4. Verify Nebula is Running
-
-```bash
-# SSH to Lighthouse
+# SSH to the Lighthouse
 ssh -i ~/.ssh/kshitiz-lighthouse ubuntu@$LIGHTHOUSE_IP
 
-# Check Nebula service
+# Check Nebula service status (should be active and running)
 sudo systemctl status nebula
 
-# Verify Nebula interface
+# Verify Nebula network interface is up and has the correct IP
 ip addr show nebula1
-# Expected: inet 10.42.0.1/16
+# Expected: inet 10.42.0.1/16 ...
 
-# Check Nebula is listening
-sudo netstat -ulnp | grep 4242
-# Expected: udp 0.0.0.0:4242
-
-# Test Prometheus metrics
-curl http://127.0.0.1:8080/metrics
-
+# Exit the SSH session
 exit
 ```
 
 ## Phase 5: Retrieve Nebula CA
 
-This phase is now handled entirely by Ansible and 1Password. The CA certificate is stored securely in 1Password and fetched by Ansible as needed, so manual retrieval is no longer necessary.
+This phase is now obsolete. The Ansible playbook handles the secure distribution of the CA certificate from the 1Password-backed Ansible Vault.
 
 ## Verification Checklist
 
-- [ ] AWS Lightsail instance running
-- [ ] Static IP attached
-- [ ] Firewall rules configured (SSH, Nebula, HTTPS)
-- [ ] Terraform successfully fetched credentials from 1Password
-- [ ] SSH access works with key
-- [ ] Ansible successfully configured the instance
-- [ ] Nebula service running (`systemctl status nebula`)
-- [ ] Nebula interface up (`ip addr show nebula1`)
+- [x] AWS Lightsail instance running
+- [x] Static IP attached
+- [x] Firewall rules configured
+- [x] Terraform successfully fetched credentials from 1Password
+- [x] SSH access works with key
+- [x] **Ansible playbook ran successfully and configured the instance**
+- [x] **Nebula service is active (`systemctl status nebula`)**
+- [x] **Nebula interface is up with correct IP (`ip addr show nebula1`)**
 
 ## Common Issues
 

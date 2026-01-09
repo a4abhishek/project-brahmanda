@@ -88,7 +88,7 @@ install_main_tools() {
   fi
   
   # Brew install is idempotent; it will only install if not already present
-  brew install ansible 1password-cli
+  brew install ansible ansible-lint ansible-dev-tools 1password-cli
   success "Main tools installed"
 }
 

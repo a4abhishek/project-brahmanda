@@ -1,0 +1,16 @@
+---
+# Vyom (Compute) Ansible Vault Template
+# Generated from: make nidhi-tirodhana VAULT=vyom
+# DO NOT EDIT vault.yml DIRECTLY - Edit this template and regenerate
+#
+# This template uses 1Password secret references (op: //)
+# Run `make nidhi-tirodhana VAULT=vyom` to generate the encrypted vault.yml
+
+# SSH Private Key for Vyom Nodes (Proxmox VMs)
+ssh_private_key: |
+  op://Project-Brahmanda/Vyom-Node-Key-Pair/private key
+
+# K3s Cluster Token (generated during bootstrap, stored for recovery)
+# Note: This will be populated after initial K3s installation
+# k3s_token: |
+#   op: //Project-Brahmanda/K3s-Cluster-Tokens/server-token

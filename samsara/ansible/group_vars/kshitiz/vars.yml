@@ -1,0 +1,13 @@
+# samsara/ansible/group_vars/kshitiz/vars.yml
+#
+# Non-secret variables for the Kshitiz (edge) group.
+---
+# Directory where Nebula configuration and certs are stored on the remote host.
+nebula_config_dir: "/etc/nebula"
+
+# The IP address for the lighthouse node within the Nebula network.
+# This must match the IP used when signing the certificate.
+lighthouse_ip: "10.42.0.1/16"
+
+# The external UDP port the lighthouse listens on.
+lighthouse_port: 4242

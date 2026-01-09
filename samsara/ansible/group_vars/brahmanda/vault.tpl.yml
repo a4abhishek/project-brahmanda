@@ -1,0 +1,15 @@
+---
+# Brahmanda (Global) Ansible Vault Template
+# Generated from: make nidhi-tirodhana VAULT=brahmanda
+# DO NOT EDIT vault.yml DIRECTLY - Edit this template and regenerate
+#
+# This template uses 1Password secret references (op: //)
+# Run `make nidhi-tirodhana VAULT=brahmanda` to generate the encrypted vault.yml
+
+# Nebula CA Root Certificate
+nebula_ca_crt: |
+  op://Project-Brahmanda/Nebula-CA-Root-Certificate/ca.crt
+
+# Nebula CA Private Key (Critical - Guards the entire mesh)
+nebula_ca_key: |
+  op://Project-Brahmanda/Nebula-CA-Root-Certificate/ca.key

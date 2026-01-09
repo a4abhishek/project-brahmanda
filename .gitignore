@@ -36,5 +36,5 @@ samsara/proxmox/answer.local.toml
 .cache/
 
 # Ansible Vault Templates and Temporary Files
-samsara/ansible/group_vars/*/*.tpl.yml
 samsara/ansible/group_vars/*/*.tmp.yml
+
