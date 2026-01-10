@@ -107,6 +107,7 @@ nidhi-tirodhana: install-python-requirements
 				echo "  → Processing $$vault..."; \
 				.venv/bin/python3 scripts/inject-secrets.py "samsara/ansible/group_vars/$$vault/vault.tpl.yml" "samsara/ansible/group_vars/$$vault/vault.tmp.yml" && \
 				(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault encrypt "group_vars/$$vault/vault.tmp.yml" \
+					--encrypt-vault-id default \
 					--vault-password-file=../../scripts/get-vault-password.sh \
 					--output="group_vars/$$vault/vault.yml") && \
 				rm -f "samsara/ansible/group_vars/$$vault/vault.tmp.yml" && \
@@ -124,6 +125,7 @@ nidhi-tirodhana: install-python-requirements
 		fi; \
 		.venv/bin/python3 scripts/inject-secrets.py "samsara/ansible/group_vars/$(VAULT)/vault.tpl.yml" "samsara/ansible/group_vars/$(VAULT)/vault.tmp.yml" && \
 		(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault encrypt "group_vars/$(VAULT)/vault.tmp.yml" \
+			--encrypt-vault-id default \
 			--vault-password-file=../../scripts/get-vault-password.sh \
 			--output="group_vars/$(VAULT)/vault.yml") && \
 		rm -f "samsara/ansible/group_vars/$(VAULT)/vault.tmp.yml" && \
@@ -323,9 +325,16 @@ kshitiz:
 	@echo "☁️  Provisioning Kshitiz (Edge Layer)..."
 	@echo "INFO: Running Terraform for the Lightsail instance..."
 	(cd samsara/terraform/kshitiz && terraform init && terraform apply -auto-approve)
+
+	@echo "INFO: Preparing to configure the Lighthouse with Ansible..."
+	@op read "op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key" > /tmp/kshitiz_ssh_key
+	@chmod 600 /tmp/kshitiz_ssh_key
+
 	@echo "INFO: Running Ansible to configure the Lighthouse..."
 	(cd samsara/ansible && $(ANSIBLE_ENV) ansible-playbook playbooks/01-bootstrap-kshitiz.yml --vault-password-file <(op read 'op://Project-Brahmanda/Ansible Vault - Samsara/password'))
-	@echo "SUCCESS: Kshitiz has been provisioned."
+
+	@rm -f /tmp/kshitiz_ssh_key
+	@echo "SUCCESS: Kshitiz has been provisioned and configured."
 
 vyom:
 	@echo "🏠  Provisioning Vyom (Compute Layer)..."

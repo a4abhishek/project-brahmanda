@@ -10,6 +10,11 @@ data "onepassword_item" "aws_credentials" {
   title  = "AWS-samsara-iac"
 }
 
+data "onepassword_item" "kshitiz_ssh_public_key" {
+  vault = "Project-Brahmanda"
+  title = "Kshitiz-Lighthouse-SSH-Key"
+}
+
 locals {
   # Extract fields from the "Security Credentials" section
   aws_creds_fields = flatten([
@@ -39,7 +44,7 @@ provider "aws" {
 # 0. SSH Key Pair
 resource "aws_lightsail_key_pair" "kshitiz_key" {
   name       = "kshitiz-key-pair"
-  public_key = file(var.ssh_public_key_path)
+  public_key = data.onepassword_item.kshitiz_ssh_public_key.public_key
 }
 
 # 1. The Lighthouse Instance

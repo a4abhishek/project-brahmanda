@@ -6,10 +6,6 @@
 # This template uses 1Password secret references (op://)
 # Run `make nidhi-tirodhana VAULT=kshitiz` to generate the encrypted vault.yml
 
-# SSH Private Key for Kshitiz Lightsail Instance
-ssh_private_key: |
-  op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key
-
 # Nebula CA Certificate (Public) - Required by all nodes to verify others
 nebula_ca_crt: |
   op://Project-Brahmanda/Nebula-CA-Root-Certificate/ca.crt

@@ -5,9 +5,9 @@
   # The 'vars_files' section is commented out because Ansible automatically
   # loads variables from 'group_vars/kshitiz/'. The 'vault.yml' file will be
   # loaded automatically.
-  # vars_files:
-  #   - ../group_vars/kshitiz/vars.yml
-  #   - ../group_vars/kshitiz/vault.yml
+  vars_files:
+    - ../group_vars/kshitiz/vars.yml
+    - ../group_vars/kshitiz/vault.yml
 
   tasks:
     - name: 📂 Create Nebula configuration directory
@@ -54,7 +54,7 @@
         owner: root
         group: root
         mode: '0644'
-      notify: Restart Nebula # This tells Ansible to run the "Restart Nebula" handler if this file changes.
+      notify: 🔄️ Restart Nebula # This tells Ansible to run the "Restart Nebula" handler if this file changes.
 
     - name: ⚙️ Deploy Nebula systemd service unit file
       ansible.builtin.copy:
@@ -72,7 +72,7 @@
           KillMode=process
           [Install]
           WantedBy=multi-user.target
-      notify: Reload systemd # Tell systemd to re-read its config
+      notify: 🔄️ Reload systemd # Tell systemd to re-read its config
 
     - name: ☑️ Enable and start Nebula service
       ansible.builtin.systemd:
@@ -81,7 +81,7 @@
         enabled: true
 
   handlers:
-    - name: Reload systemd
+    - name: 🔄️ Reload systemd
       ansible.builtin.systemd:
         daemon_reload: true
 
