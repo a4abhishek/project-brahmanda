@@ -19,6 +19,11 @@ endif
 SHELL := /bin/bash
 INSTALL_SCRIPT := ./scripts/install_tools.sh
 
+# Ansible Environment
+# We set ANSIBLE_CONFIG explicitly to avoid issues with world-writable directories (WSL)
+export ANSIBLE_CONFIG := $(CURDIR)/samsara/ansible/ansible.cfg
+ANSIBLE_ENV := ANSIBLE_CONFIG=$(ANSIBLE_CONFIG)
+
 
 # --- Phony Targets ---
 # These targets do not represent files.
@@ -85,17 +90,25 @@ init: install_tools check_auth
 
 # --- Vault Management ---
 
-nidhi-tirodhana:
+install-python-requirements:
+	@echo "🐍 Checking/Installing Python dependencies..."
+	@if [ ! -d ".venv" ]; then \
+		echo "Creating virtual environment..."; \
+		python3 -m venv .venv; \
+	fi
+	@.venv/bin/pip install -q -r requirements.txt
+
+nidhi-tirodhana: install-python-requirements
 	@chmod +x scripts/get-vault-password.sh
 	@if [ -z "$(VAULT)" ]; then \
 		echo "💎🔒 Nidhi-Tirodhana: Generating and securing all treasure repositories..."; \
 		for vault in brahmanda kshitiz vyom; do \
 			if [ -f "samsara/ansible/group_vars/$$vault/vault.tpl.yml" ]; then \
 				echo "  → Processing $$vault..."; \
-				op inject -i "samsara/ansible/group_vars/$$vault/vault.tpl.yml" -o "samsara/ansible/group_vars/$$vault/vault.tmp.yml" && \
-				ansible-vault encrypt "samsara/ansible/group_vars/$$vault/vault.tmp.yml" \
-					--vault-password-file=scripts/get-vault-password.sh \
-					--output="samsara/ansible/group_vars/$$vault/vault.yml" && \
+				.venv/bin/python3 scripts/inject-secrets.py "samsara/ansible/group_vars/$$vault/vault.tpl.yml" "samsara/ansible/group_vars/$$vault/vault.tmp.yml" && \
+				(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault encrypt "group_vars/$$vault/vault.tmp.yml" \
+					--vault-password-file=../../scripts/get-vault-password.sh \
+					--output="group_vars/$$vault/vault.yml") && \
 				rm -f "samsara/ansible/group_vars/$$vault/vault.tmp.yml" && \
 				echo "  ✅ $$vault treasury secured"; \
 			else \
@@ -109,10 +122,10 @@ nidhi-tirodhana:
 			echo "❌ Template not found: samsara/ansible/group_vars/$(VAULT)/vault.tpl.yml"; \
 			exit 1; \
 		fi; \
-		op inject -i "samsara/ansible/group_vars/$(VAULT)/vault.tpl.yml" -o "samsara/ansible/group_vars/$(VAULT)/vault.tmp.yml" && \
-		ansible-vault encrypt "samsara/ansible/group_vars/$(VAULT)/vault.tmp.yml" \
-			--vault-password-file=scripts/get-vault-password.sh \
-			--output="samsara/ansible/group_vars/$(VAULT)/vault.yml" && \
+		.venv/bin/python3 scripts/inject-secrets.py "samsara/ansible/group_vars/$(VAULT)/vault.tpl.yml" "samsara/ansible/group_vars/$(VAULT)/vault.tmp.yml" && \
+		(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault encrypt "group_vars/$(VAULT)/vault.tmp.yml" \
+			--vault-password-file=../../scripts/get-vault-password.sh \
+			--output="group_vars/$(VAULT)/vault.yml") && \
 		rm -f "samsara/ansible/group_vars/$(VAULT)/vault.tmp.yml" && \
 		echo "✅ $(VAULT) treasury secured successfully"; \
 	fi
@@ -123,8 +136,8 @@ nidhi-nikasha:
 	@for vault in brahmanda kshitiz vyom; do \
 		if [ -f "samsara/ansible/group_vars/$$vault/vault.yml" ]; then \
 			echo "  → Examining $$vault..."; \
-			ansible-vault view "samsara/ansible/group_vars/$$vault/vault.yml" \
-				--vault-password-file=scripts/get-vault-password.sh > /dev/null && \
+			(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault view "group_vars/$$vault/vault.yml" \
+				--vault-password-file=../../scripts/get-vault-password.sh > /dev/null) && \
 			echo "  ✅ $$vault treasury intact"; \
 		else \
 			echo "  ⚠️  No vault found for $$vault (skipping)"; \
@@ -139,13 +152,13 @@ nidhi-avirbhava:
 		for vault in brahmanda kshitiz vyom; do \
 			if [ -f "samsara/ansible/group_vars/$$vault/vault.yml" ] && head -n1 "samsara/ansible/group_vars/$$vault/vault.yml" | grep -q '\$$ANSIBLE_VAULT'; then \
 				echo "  - Decrypting $$vault vault..."; \
-				ansible-vault decrypt "samsara/ansible/group_vars/$$vault/vault.yml" --vault-password-file scripts/get-vault-password.sh; \
+				(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault decrypt "group_vars/$$vault/vault.yml" --vault-password-file ../../scripts/get-vault-password.sh); \
 			fi; \
 		done; \
 		echo "✅ All treasure repositories manifested successfully"; \
 	else \
 		echo "💎🔓 Nidhi-Avirbhava: Manifesting $(VAULT) treasury..."; \
-		ansible-vault decrypt "samsara/ansible/group_vars/$(VAULT)/vault.yml" --vault-password-file scripts/get-vault-password.sh; \
+		(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault decrypt "group_vars/$(VAULT)/vault.yml" --vault-password-file ../../scripts/get-vault-password.sh); \
 		echo "✅ $(VAULT) treasury manifested successfully"; \
 	fi
 
@@ -157,7 +170,7 @@ samshodhana:
 	fi
 	@echo "📝 Editing $(VAULT) Ansible Vault..."
 	@chmod +x scripts/get-vault-password.sh
-	@ansible-vault edit "samsara/ansible/group_vars/$(VAULT)/vault.yml" --vault-password-file scripts/get-vault-password.sh
+	@(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault edit "group_vars/$(VAULT)/vault.yml" --vault-password-file ../../scripts/get-vault-password.sh)
 	@echo "SUCCESS: $(VAULT) vault editing complete."
 
 
@@ -309,17 +322,17 @@ srishti:
 kshitiz:
 	@echo "☁️  Provisioning Kshitiz (Edge Layer)..."
 	@echo "INFO: Running Terraform for the Lightsail instance..."
-	#(cd samsara/terraform/kshitiz && terraform init && terraform apply -auto-approve)
+	(cd samsara/terraform/kshitiz && terraform init && terraform apply -auto-approve)
 	@echo "INFO: Running Ansible to configure the Lighthouse..."
-	# ansible-playbook samsara/ansible/playbooks/01-bootstrap-edge.yml --vault-password-file <(op read 'op://Project-Brahmanda/Ansible Vault - Samsara/password')
+	(cd samsara/ansible && $(ANSIBLE_ENV) ansible-playbook playbooks/01-bootstrap-kshitiz.yml --vault-password-file <(op read 'op://Project-Brahmanda/Ansible Vault - Samsara/password'))
 	@echo "SUCCESS: Kshitiz has been provisioned."
 
 vyom:
 	@echo "🏠  Provisioning Vyom (Compute Layer)..."
 	@echo "INFO: Running Terraform for the Proxmox VMs..."
-	#(cd samsara/terraform/vyom && terraform init && terraform apply -auto-approve)
+	(cd samsara/terraform/vyom && terraform init && terraform apply -auto-approve)
 	@echo "INFO: Running Ansible to bootstrap the Kubernetes cluster..."
-	# ansible-playbook samsara/ansible/playbooks/02-bootstrap-cluster.yml --vault-password-file <(op read 'op://Project-Brahmanda/Ansible Vault - Samsara/password')
+	(cd samsara/ansible && $(ANSIBLE_ENV) ansible-playbook playbooks/02-bootstrap-cluster.yml --vault-password-file <(op read 'op://Project-Brahmanda/Ansible Vault - Samsara/password'))
 	@echo "SUCCESS: Vyom has been provisioned."
 
 pralaya:

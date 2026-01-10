@@ -3,7 +3,7 @@
 # Generated from: make nidhi-tirodhana VAULT=kshitiz
 # DO NOT EDIT vault.yml DIRECTLY - Edit this template and regenerate
 #
-# This template uses 1Password secret references (op: //)
+# This template uses 1Password secret references (op://)
 # Run `make nidhi-tirodhana VAULT=kshitiz` to generate the encrypted vault.yml
 
 # SSH Private Key for Kshitiz Lightsail Instance

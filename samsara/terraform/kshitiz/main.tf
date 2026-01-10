@@ -36,6 +36,12 @@ provider "aws" {
   }
 }
 
+# 0. SSH Key Pair
+resource "aws_lightsail_key_pair" "kshitiz_key" {
+  name       = "kshitiz-key-pair"
+  public_key = file(var.ssh_public_key_path)
+}
+
 # 1. The Lighthouse Instance
 # We use the literal blueprint_id "ubuntu_24_04"
 resource "aws_lightsail_instance" "kshitiz" {
@@ -43,6 +49,7 @@ resource "aws_lightsail_instance" "kshitiz" {
   availability_zone = "${var.aws_region}a"
   blueprint_id      = "ubuntu_24_04"
   bundle_id         = var.instance_bundle_id
+  key_pair_name     = aws_lightsail_key_pair.kshitiz_key.name
 
   # User data for initial Nebula bootstrap
   user_data = templatefile("${path.module}/user-data.sh", {
@@ -68,6 +75,10 @@ resource "aws_lightsail_static_ip" "kshitiz" {
 resource "aws_lightsail_static_ip_attachment" "kshitiz_attach" {
   static_ip_name = aws_lightsail_static_ip.kshitiz.name
   instance_name  = aws_lightsail_instance.kshitiz.name
+
+  lifecycle {
+    replace_triggered_by = [aws_lightsail_instance.kshitiz]
+  }
 }
 
 # 3. Firewall rules for Lighthouse

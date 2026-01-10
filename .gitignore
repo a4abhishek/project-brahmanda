@@ -15,6 +15,7 @@ terraform.rc
 
 # Ansible
 *.retry
+ansible.log
 
 # IDE
 .vscode/
@@ -38,3 +39,4 @@ samsara/proxmox/answer.local.toml
 # Ansible Vault Templates and Temporary Files
 samsara/ansible/group_vars/*/*.tmp.yml
 
+.venv/

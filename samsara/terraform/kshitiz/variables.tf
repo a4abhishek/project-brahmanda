@@ -31,6 +31,12 @@ variable "nebula_lighthouse_port" {
 }
 
 # Security Configuration
+variable "ssh_public_key_path" {
+  description = "Path to the SSH public key to upload to Lightsail"
+  type        = string
+  default     = "~/.ssh/kshitiz-lighthouse.pub"
+}
+
 variable "ssh_allowed_cidrs" {
   description = "CIDR blocks allowed to SSH into Lighthouse"
   type        = list(string)
