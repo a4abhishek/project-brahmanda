@@ -327,21 +327,52 @@ kshitiz:
 	(cd samsara/terraform/kshitiz && terraform init && terraform apply -auto-approve)
 
 	@echo "INFO: Preparing to configure the Lighthouse with Ansible..."
-	@op read "op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key" > /tmp/kshitiz_ssh_key
-	@chmod 600 /tmp/kshitiz_ssh_key
-
-	@echo "INFO: Running Ansible to configure the Lighthouse..."
-	(cd samsara/ansible && $(ANSIBLE_ENV) ansible-playbook playbooks/01-bootstrap-kshitiz.yml --vault-password-file <(op read 'op://Project-Brahmanda/Ansible Vault - Samsara/password'))
-
-	@rm -f /tmp/kshitiz_ssh_key
+	@# Use a self-contained shell script block with a trap for robust cleanup
+	@/bin/bash -c ' \
+		set -e; \
+		KEY_FILE="/tmp/kshitiz_ssh_key_$$$$"; \
+		cleanup() { \
+			echo "INFO: Cleaning up temporary SSH key..."; \
+			rm -f "$$KEY_FILE"; \
+		}; \
+		trap cleanup EXIT; \
+		echo "INFO: Materializing SSH key for Kshitiz..."; \
+		op read "op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key" > "$$KEY_FILE"; \
+		chmod 600 "$$KEY_FILE"; \
+		echo "INFO: Running Ansible to configure the Lighthouse..."; \
+		(cd samsara/ansible && \
+			$(ANSIBLE_ENV) ansible-playbook playbooks/01-bootstrap-kshitiz.yml \
+			--private-key="$$KEY_FILE" \
+			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
+		); \
+	'
 	@echo "SUCCESS: Kshitiz has been provisioned and configured."
 
 vyom:
 	@echo "🏠  Provisioning Vyom (Compute Layer)..."
 	@echo "INFO: Running Terraform for the Proxmox VMs..."
 	(cd samsara/terraform/vyom && terraform init && terraform apply -auto-approve)
-	@echo "INFO: Running Ansible to bootstrap the Kubernetes cluster..."
-	(cd samsara/ansible && $(ANSIBLE_ENV) ansible-playbook playbooks/02-bootstrap-cluster.yml --vault-password-file <(op read 'op://Project-Brahmanda/Ansible Vault - Samsara/password'))
+
+	@echo "INFO: Preparing to configure Vyom nodes with Ansible..."
+	@# This follows the same robust cleanup pattern as the kshitiz target
+	@/bin/bash -c ' \
+		set -e; \
+		KEY_FILE="/tmp/vyom_ssh_key_$$$$"; \
+		cleanup() { \
+			echo "INFO: Cleaning up temporary SSH key for Vyom..."; \
+			rm -f "$$KEY_FILE"; \
+		}; \
+		trap cleanup EXIT; \
+		echo "INFO: Materializing SSH key for Vyom..."; \
+		op read "op://Project-Brahmanda/Vyom-Node-SSH-Key/private key" > "$$KEY_FILE"; \
+		chmod 600 "$$KEY_FILE"; \
+		echo "INFO: Running Ansible to bootstrap the Kubernetes cluster..."; \
+		(cd samsara/ansible && \
+			$(ANSIBLE_ENV) ansible-playbook playbooks/02-bootstrap-cluster.yml \
+			--private-key="$$KEY_FILE" \
+			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
+		); \
+	'
 	@echo "SUCCESS: Vyom has been provisioned."
 
 pralaya:
