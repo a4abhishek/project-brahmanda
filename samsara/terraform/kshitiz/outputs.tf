@@ -37,18 +37,19 @@ output "nebula_lighthouse_endpoint" {
 }
 
 # Ansible Inventory
-output "ansible_inventory" {
-  description = "Ansible inventory entry for this host"
-  value = yamlencode({
-    all = {
-      hosts = {
-        kshitiz = {
+# Generate Automation Manifest
+# This file serves as a clean interface between Terraform and other tools.
+resource "local_file" "automation_manifest" {
+  content = jsonencode({
+    kshitiz = {
+      hosts = [
+        {
+          name         = aws_lightsail_instance.kshitiz.id
           ansible_host = aws_lightsail_static_ip.kshitiz.ip_address
           ansible_user = "ubuntu"
-          nebula_ip    = var.lighthouse_nebula_ip
-          role         = "lighthouse"
         }
-      }
+      ]
     }
   })
+  filename = "${path.module}/manifest.json"
 }

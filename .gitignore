@@ -38,5 +38,6 @@ samsara/proxmox/answer.local.toml
 
 # Ansible Vault Templates and Temporary Files
 samsara/ansible/group_vars/*/*.tmp.yml
-
+samsara/ansible/inventory/hosts.yml
+samsara/terraform/kshitiz/manifest.json
 .venv/
