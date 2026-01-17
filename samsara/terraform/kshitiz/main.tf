@@ -58,8 +58,7 @@ resource "aws_lightsail_instance" "kshitiz" {
 
   # User data for initial Nebula bootstrap
   user_data = templatefile("${path.module}/user-data.sh", {
-    nebula_version = var.nebula_version
-    ssh_port       = var.ssh_port
+    ssh_port = var.ssh_port
   })
 
   tags = {

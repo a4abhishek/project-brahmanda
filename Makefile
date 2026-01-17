@@ -85,7 +85,7 @@ help:
 	@echo "                           Example: make shuddhi USB_DEVICE=/dev/sdb FORMAT=fat32 LABEL=\"USB_DRIVE\""
 	@echo "                           Example: make samskara KEEP_POPUP=true  # Preserve popup"
 
-init: install_tools check_auth
+init: install_tools check_auth install-ansible-collections
 	@echo "✅ Environment is initialized and ready."
 
 # --- Vault Management ---
@@ -97,6 +97,10 @@ install-python-requirements:
 		python3 -m venv .venv; \
 	fi
 	@.venv/bin/pip install -q -r requirements.txt
+
+install-ansible-collections:
+	@echo "Installing Ansible collections..."
+	@ansible-galaxy collection install community.general
 
 nidhi-tirodhana: install-python-requirements
 	@chmod +x scripts/get-vault-password.sh

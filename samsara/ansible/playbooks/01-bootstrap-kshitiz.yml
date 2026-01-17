@@ -18,6 +18,9 @@
     - name: 🛡️ Harden SSH Server
       import_tasks: ./tasks/harden_ssh.yml
 
+    - name: 🌀 Install Nebula
+      import_tasks: ./tasks/install_nebula.yml
+
     - name: 📂 Create Nebula configuration directory
       ansible.builtin.file:
         path: /etc/nebula

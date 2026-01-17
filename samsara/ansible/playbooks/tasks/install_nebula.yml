@@ -1,0 +1,36 @@
+- name: Install Nebula Binary and Dependencies
+  block:
+    - name: Ensure Nebula dependencies are installed
+      ansible.builtin.apt:
+        name:
+          - curl
+          - wget
+          - unzip
+        state: present
+
+    - name: Create Nebula directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - /etc/nebula
+        - /var/log/nebula
+
+    - name: Download and unarchive Nebula
+      ansible.builtin.unarchive:
+        src: "https://github.com/slackhq/nebula/releases/download/v{{ nebula_version }}/nebula-linux-amd64.tar.gz"
+        dest: /usr/local/bin
+        remote_src: yes
+        mode: '0755'
+        owner: root
+        group: root
+      # This will place 'nebula' and 'nebula-cert' directly in /usr/local/bin
+
+    - name: Allow Nebula port in UFW
+      community.general.ufw:
+        rule: allow
+        port: '4242'
+        proto: udp

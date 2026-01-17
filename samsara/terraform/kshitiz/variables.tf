@@ -18,12 +18,6 @@ variable "instance_bundle_id" {
 }
 
 # Nebula Configuration
-variable "nebula_version" {
-  description = "Nebula version to install"
-  type        = string
-  default     = "1.10.0"
-}
-
 variable "ssh_port" {
   description = "SSH port for the Lighthouse instance"
   type        = number

@@ -2,6 +2,9 @@
 #
 # Non-secret variables for the Kshitiz (edge) group.
 ---
+# The version of Nebula to install.
+nebula_version: "1.10.0"
+
 # Directory where Nebula configuration and certs are stored on the remote host.
 nebula_config_dir: "/etc/nebula"
 
