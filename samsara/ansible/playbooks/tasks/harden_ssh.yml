@@ -1,0 +1,33 @@
+- name: 🛡️ Harden SSH Server
+  block:
+    - name: Back up original sshd_config before making changes
+      ansible.builtin.copy:
+        src: /etc/ssh/sshd_config
+        dest: /etc/ssh/sshd_config.original
+        remote_src: yes
+        force: no
+        owner: root
+        group: root
+        mode: '0644'
+      tags:
+        - ssh_hardening
+
+    - name: 📜 Enforce secure SSH configuration
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?{{ item.regexp }}'
+        line: '{{ item.line }}'
+        state: present
+        validate: 'sshd -t -f %s'
+      loop:
+        - { regexp: 'PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
+        - { regexp: 'PasswordAuthentication', line: 'PasswordAuthentication no' }
+        - { regexp: 'KbdInteractiveAuthentication', line: 'KbdInteractiveAuthentication no' }
+        - { regexp: 'UsePAM', line: 'UsePAM no' }
+        - { regexp: 'PermitRootLogin', line: 'PermitRootLogin no' }
+        - { regexp: 'X11Forwarding', line: 'X11Forwarding no' }
+        - { regexp: 'AllowAgentForwarding', line: 'AllowAgentForwarding no' }
+        - { regexp: 'MaxAuthTries', line: 'MaxAuthTries 2' }
+      notify: 🔄️ Restart sshd
+      tags:
+        - ssh_hardening

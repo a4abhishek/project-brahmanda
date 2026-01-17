@@ -59,6 +59,7 @@ resource "aws_lightsail_instance" "kshitiz" {
   # User data for initial Nebula bootstrap
   user_data = templatefile("${path.module}/user-data.sh", {
     nebula_version = var.nebula_version
+    ssh_port       = var.ssh_port
   })
 
   tags = {
@@ -93,8 +94,8 @@ resource "aws_lightsail_instance_public_ports" "firewall" {
   # SSH: Secure management
   port_info {
     protocol  = "tcp"
-    from_port = 22
-    to_port   = 22
+    from_port = var.ssh_port
+    to_port   = var.ssh_port
     cidrs     = var.ssh_allowed_cidrs
   }
 

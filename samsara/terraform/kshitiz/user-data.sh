@@ -28,6 +28,7 @@ ufw default allow outgoing
 ufw allow 22/tcp      # SSH
 ufw allow 4242/udp    # Nebula
 ufw allow 443/tcp     # HTTPS
+ufw reload
 
 # Download Nebula
 NEBULA_VERSION="${nebula_version}"

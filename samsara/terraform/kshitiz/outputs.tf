@@ -47,6 +47,7 @@ resource "local_file" "automation_manifest" {
           name         = aws_lightsail_instance.kshitiz.id
           ansible_host = aws_lightsail_static_ip.kshitiz.ip_address
           ansible_user = "ubuntu"
+          ansible_port = var.ssh_port
         }
       ]
     }

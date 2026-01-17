@@ -9,7 +9,15 @@
     - ../group_vars/kshitiz/vars.yml
     - ../group_vars/kshitiz/vault.yml
 
+  gather_facts: true
+
+  handlers:
+    - import_tasks: ../handlers/main.yml
+
   tasks:
+    - name: 🛡️ Harden SSH Server
+      import_tasks: ./tasks/harden_ssh.yml
+
     - name: 📂 Create Nebula configuration directory
       ansible.builtin.file:
         path: /etc/nebula

@@ -24,6 +24,12 @@ variable "nebula_version" {
   default     = "1.10.0"
 }
 
+variable "ssh_port" {
+  description = "SSH port for the Lighthouse instance"
+  type        = number
+  default     = 22
+}
+
 variable "nebula_lighthouse_port" {
   description = "UDP port for Nebula Lighthouse"
   type        = number
