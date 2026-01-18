@@ -2,19 +2,18 @@ terraform {
   required_version = ">= 1.9.0"
 
   required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
     onepassword = {
       source = "1Password/onepassword"
+    }
+    proxmox = {
+      source = "Telmate/proxmox"
     }
   }
 
   # Backend configuration (uncomment after first successful apply)
   # backend "s3" {
   #   bucket = "brahmanda-terraform-state"
-  #   key    = "kshitiz/terraform.tfstate"
+  #   key    = "vyom/terraform.tfstate"
   #   region = "ap-southeast-1a"
   # }
 }

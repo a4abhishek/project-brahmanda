@@ -215,7 +215,7 @@ ansible-playbook -i inventory/hosts.yml playbooks/01-bootstrap-edge.yml --check
 backend "s3" {
   bucket = "brahmanda-terraform-state"
   key    = "kshitiz/terraform.tfstate"
-  region = "us-east-1"
+  region = "ap-southeast-1a"
 }
 ```
 
