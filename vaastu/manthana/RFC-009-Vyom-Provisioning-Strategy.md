@@ -1,6 +1,6 @@
 # RFC-009: Vyom (Compute Layer) Provisioning Strategy
 
-**Status:** Proposed<br>
+**Status:** Accepted<br>
 **Date:** 2026-01-18
 
 ## 1. Context

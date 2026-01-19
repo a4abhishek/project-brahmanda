@@ -1,6 +1,6 @@
 # **RFC 006: Automated Ansible Vault Generation from 1Password**
 
-**Status:** Proposed
+**Status:** Accepted<br>
 **Date:** 2026-01-07
 **Supersedes:** Enhances RFC-003 (Hybrid Secret Management)
 

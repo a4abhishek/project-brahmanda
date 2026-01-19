@@ -1,6 +1,6 @@
 # **RFC-007: Terraform Secret Management with 1Password Provider**
 
-**Status:** Proposed
+**Status:** Accepted<br>
 **Date:** 2026-01-08
 **Enhances:** [ADR-003: Hybrid Secret Management Strategy](../vidhana/ADR-003-secret-management.md)
 
