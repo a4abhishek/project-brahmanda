@@ -14,42 +14,42 @@ This document is the definitive **Day 0 manual for Project Brahmanda**. It descr
 
 It serves as the immutable **Blueprint** for Project Brahmanda, written with the explicit understanding that all infrastructure is **transient**. We wield the **Weapon of Detachment**—Infrastructure as Code—to sever dependency on individual nodes, enabling us to replicate, destroy, and recreate the universe without hesitation or attachment.
 
-## **Phase 0: Samidha (Before You Begin)**
+## Phase 0: Samidha (Before You Begin)
 
 Before starting the manifestation process, ensure you have:
 
-### **Accounts & Access**
+### Accounts & Access
 
 - **1Password Account:** You must have a 1Password account (individual or family plan). This will serve as the secure vault for all credentials.
 - **AWS Account:** An active AWS account with billing enabled.
 - **Cloudflare Account:** An active Cloudflare account with R2 storage access.
 - **GitHub Account:** An active GitHub account where this repository will be hosted.
 
-### **Software Requirements**
+### Software Requirements
 
 - **Operating System:** Windows 10/11, macOS, or Linux.
 - **Terminal Access:** PowerShell (Windows), Terminal (macOS), or Bash (Linux).
 - **Git:** Installed and configured with your GitHub credentials.
 - **1Password CLI (`op`):** Install from [1Password Developer Docs](https://developer.1password.com/docs/cli/get-started/).
 
-### **Hardware Requirements (Beyond NUC Components)**
+### Hardware Requirements (Beyond NUC Components)
 
 - **USB Drive:** 8GB minimum (will be used for bootable Proxmox installation media)
 - **Wired USB Keyboard:** Required for BIOS configuration during OS installation
   - Bluetooth keyboards do NOT work during BIOS/boot (pre-OS environment)
   - Can borrow temporarily if you only have Bluetooth keyboards
 
-### **Skills Assumed**
+### Skills Assumed
 
 - Basic command-line navigation (cd, ls/dir, running commands).
 - Ability to copy-paste credentials securely.
 - Understanding of what an IP address and subnet mask are.
 
-## **Phase 1: Upadana (The Material Cause)**
+## Phase 1: Upadana (The Material Cause)
 
 _Goal: Procure high-performance, SRE-grade hardware. We prioritize specific component speeds to ensure Vyom is not bottlenecked at the storage or memory bus._
 
-### **Core Hardware Specifications**
+### Core Hardware Specifications
 
 | Component   | Specification                                   | Source                                                                                                                                                                                          | Price         |
 | :---------- | :---------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------ |
@@ -78,7 +78,7 @@ _Goal: Procure high-performance, SRE-grade hardware. We prioritize specific comp
 
 > RAM SLOT SELECTION: The NUC motherboard has two slots stacked vertically. For a single-module configuration, always use the BOTTOM slot (the one closest to the PCB). This is typically labeled DIMM 1 or Slot A. While signal termination was a concern with older DDR3/DDR4 RAM, modern DDR5 modules (like the CT48G56C46S5) have on-die termination (ODT) built-in, eliminating this issue. However, most motherboard BIOS/firmware expects Slot 0/A to be populated first, and some systems may fail to boot or require BIOS updates if only Slot 1 is populated.
 
-### **Vistara (The Expansion Roadmap)**
+### Vistara (The Expansion Roadmap)
 
 Brahmanda is designed to grow in discrete, logical iterations:
 
@@ -86,16 +86,16 @@ Brahmanda is designed to grow in discrete, logical iterations:
 2. **Vistara (Horizontal Scale):** Add a secondary NUC node for compute high-availability or an **NVIDIA Jetson** for GPU/ML-accelerated workloads.
 3. **Sanchaya (Collection):** Introduce a dedicated NAS (Network Attached Storage) or a multi-bay DAS to handle bulk backups and long-term data retention outside the NVMe pool.
 
-### **Physical Siting (Power & Connectivity)**
+### Physical Siting (Power & Connectivity)
 
 - **Power:** The NUC must be connected to its **120W/150W Barrel Charger**, which is plugged into a **Smart Plug** (acting as a remote Kill Switch), and then into the wall outlet. Do NOT attempt to power the unit solely via a Monitor's Thunderbolt port.
 - **Location:** The NUC must be placed near the **Primary Router**. One ethernet port is the single point of entry for the entire universe; it must have a high-quality Cat6 physical link to the gateway.
 
-## **Phase 2: Sanghatana (Hardware Assembly)**
+## Phase 2: Sanghatana (Hardware Assembly)
 
 _Goal: Transform procured components into a unified, operational compute node._
 
-### **Prerequisites**
+### Prerequisites
 
 Before starting assembly, ensure you have:
 
@@ -107,7 +107,7 @@ Before starting assembly, ensure you have:
 
 > **💡 NOTE:** USB drive and wired keyboard (mentioned in Phase 0) are NOT needed for hardware assembly. They will be required later in Phase 6 (OS Installation).
 
-### **Assembly Steps**
+### Assembly Steps
 
 #### **Step 1: Unbox and Inventory Check**
 
@@ -221,7 +221,7 @@ Before starting assembly, ensure you have:
 - ✅ Smart Plug remote control works
 - ✅ No beeping or error codes during POST
 
-### **Troubleshooting**
+### Troubleshooting
 
 **No Power / No POST:**
 
@@ -247,7 +247,7 @@ Before starting assembly, ensure you have:
 - Try different router port
 - Verify router powered on
 
-### **What's Next**
+### What's Next
 
 With hardware assembled and verified, you're ready to proceed to network reconnaissance and OS installation.
 
@@ -255,7 +255,7 @@ With hardware assembled and verified, you're ready to proceed to network reconna
 
 _Goal: Reconnoiter the void, map the data, and forge the keys to the kingdom._
 
-### **Anveshana (Gather Information)**
+### Anveshana (Gather Information)
 
 Run these commands on your **Windows host machine (PowerShell)** when connected to the same WiFi that the NUC box is going to be connected to.
 
@@ -290,11 +290,11 @@ From `ipconfig /all` output, record these values:
 >
 > This separates infrastructure from user devices and provides the recommended /24 subnet per layer.
 
-## **Phase 4: Pramana (The Credentials)**
+## Phase 4: Pramana (The Credentials)
 
 _Goal: Generate authentication credentials and cryptographic identities for all infrastructure components._
 
-### **AWS Credentials**
+### AWS Credentials
 
 Generate AWS credentials that will be used by Terraform to provision Lightsail (Kshitiz):
 
@@ -388,7 +388,7 @@ Generate AWS credentials that will be used by Terraform to provision Lightsail (
 
   > **💡 NOTE:** This SSH key will be uploaded to Lightsail by Terraform during provisioning. The private key is needed for Ansible to connect later.
 
-### **Cloudflare Credentials**
+### Cloudflare Credentials
 
 Generate Cloudflare credentials for Terraform state and DNS management:
 
@@ -431,7 +431,7 @@ Generate Cloudflare credentials for Terraform state and DNS management:
   <details>
   <summary>1Password Storage Instructions</summary>
 
-  **Step 1:** Open 1Password and navigate to the **"Project-Brahmanda"** vault.
+  **Step 1:** Open 1Password and create a new vault named **"Project-Brahmanda"** if it doesn't exist.
 
   **Step 2:** Create a new **API Credential** item with these details:
 
@@ -453,7 +453,7 @@ Generate Cloudflare credentials for Terraform state and DNS management:
 
   > **💡 NOTE:** The `R2_ENDPOINT` field is stored as configuration for IaC tools. While it can be generated programmatically from the Account ID, storing it explicitly in 1Password is common practice—it makes Terraform/Ansible configurations more readable and reduces string interpolation errors.
 
-### **Kshitiz - Nebula Mesh Infrastructure**
+### Kshitiz - Nebula Mesh Infrastructure
 
 The Lighthouse requires a secure overlay network. Generate the foundational credentials:
 
@@ -517,7 +517,7 @@ While these certificates will be encrypted in Ansible Vault (Phase 5), you can o
 
 **1. Store Nebula CA (Root Certificate Authority):**
 
-1. Open 1Password → Navigate to **"Project-Brahmanda"** vault.
+1. Open 1Password → Navigate to the **"Project-Brahmanda"** vault.
 2. Create a new **Secure Note** item:
    - **Title:** `Nebula-CA-Root-Certificate`
 3. Add text fields for both certificate and key:
@@ -565,16 +565,20 @@ op read "op://Project-Brahmanda/Nebula-Kshitiz-Lighthouse-Certificate/kshitiz-li
 
 The 1Password backup provides an additional recovery layer independent of Ansible Vault.
 
-### **Vyom - Cluster Infrastructure**
+### Vyom - Cluster Infrastructure
 
-The compute cluster requires SSH access and K3s identity. Generate the foundational credentials.
+The compute cluster requires a master SSH key for emergency access to all nodes.
 
-#### **SSH Key-pair Generation for Nodes**
+#### **Generate Prakriti Master Key**
 
 Generate the Ed25519 identity in WSL or Linux. This is your "Scepter" for all nodes.
 
+This key will be baked into the `prakriti-template` golden image. It serves as a "break-glass" emergency access key for all K3s nodes.
+
+1. **Generate a dedicated key pair** temporarily on your local machine. We'll remove the key from local machine in the end.
+
 ```bash
-ssh-keygen -t ed25519 -a 100 -f ~/.ssh/id_brahmanda -C "abhishek@brahmanda"
+ssh-keygen -t ed25519 -a 100 -f ~/.ssh/id_prakriti -C "abhishek@prakriti-master-key"
 ```
 
 **When prompted:**
@@ -582,22 +586,37 @@ ssh-keygen -t ed25519 -a 100 -f ~/.ssh/id_brahmanda -C "abhishek@brahmanda"
 - **Enter passphrase:** Press Enter (leave empty) for automation compatibility.
 - **Enter same passphrase again:** Press Enter again.
 
-**✅ Verification:** Run `ls -la ~/.ssh/id_brahmanda*`. You should see:
+**✅ Verification:** Run `ls -la ~/.ssh/id_prakriti*`. You should see:
 
-- `id_brahmanda` (private key)
-- `id_brahmanda.pub` (public key)
+- `id_prakriti` (private key)
+- `id_prakriti.pub` (public key)
 
-**💡 Optional: Store in 1Password for Backup**
-
-While this key will be encrypted in Ansible Vault (Phase 5), you can optionally store it in 1Password as a disaster recovery backup:
+1. **Securely Store the Private Key in 1Password.** This is its permanent location.
 
 1. Open 1Password → Navigate to **"Project-Brahmanda"** vault.
-2. Create a new **SSH Key** item:
-   - **Title:** `Vyom-Node-Key-Pair`
-   - **Private Key field:** Paste the contents of `~/.ssh/id_brahmanda` (the private key)
-3. Save the item.
+1. Create a new **SSH Key** item:
+   - **Title:** `Prakriti Master Key`
+   - **Private Key field:** Paste the contents of `~/.ssh/id_prakriti` (the private key)
+1. Save the item.
 
 1Password will automatically generate and display the public key and fingerprint from the private key. This provides an additional backup layer independent of Ansible Vault.
+
+1. **Securely delete the local key pair.** The private key now lives in 1Password. The public key will be used in a later step and can be retrieved from 1Password when needed.
+
+   ```bash
+   rm -rf ~/.ssh/id_prakriti
+   rm -rf ~/.ssh/id_prakriti.pub
+   ```
+
+**✅ Verification:**
+
+```bash
+# Verify the private key is retrievable from 1Password
+op read "op://Project-Brahmanda/Prakriti Master Key/private key"
+
+# Verify the public key is also retrievable
+op read "op://Project-Brahmanda/Prakriti Master Key/public key"
+```
 
 #### **K3s Cluster Tokens**
 
@@ -610,11 +629,11 @@ K3s tokens are automatically generated during cluster bootstrap phase. After suc
    - Store the server token and agent token as separate fields
    - This provides an additional recovery layer if Ansible Vault password is lost
 
-## **Phase 5: Adhisthana (The Foundation)**
+## Phase 5: Adhisthana (The Foundation)
 
 _Goal: Secure all credentials in a structured, recoverable manner._
 
-### **Understanding the Three-Layer Security Model**
+### Understanding the Three-Layer Security Model
 
 We distribute secrets across three layers for resilience and security:
 
@@ -635,7 +654,7 @@ We distribute secrets across three layers for resilience and security:
 
 - `OP_SERVICE_ACCOUNT_TOKEN` (added later when setting up CI/CD)
 
-### **Secret Flow (How They Connect)**
+### Secret Flow (How They Connect)
 
 ```text
 GitHub Actions
@@ -649,7 +668,7 @@ Ansible Vault Files
 Provisioning
 ```
 
-### **Implementation Steps**
+### Implementation Steps
 
 #### **Step 1: Generate the Ansible Vault Password**
 
@@ -708,10 +727,10 @@ Add SSH private key:
 ```bash
 cat >> vault.yml << 'EOF'
 
-# SSH Private Key for Nodes
+# SSH Private Key for Vyom K3s Nodes which will be added in Brahmloka
 ssh_private_key: |
 EOF
-cat ~/.ssh/id_brahmanda >> vault.yml
+cat ~/.ssh/id_prakriti >> vault.yml
 ```
 
 **Important:** The file is currently in plain text. We'll encrypt it in the next step.
@@ -769,11 +788,11 @@ Use these commands to manage vaults:
   make samshodhana VAULT=brahmanda
   ```
 
-## **Phase 6: Pratistha (OS Consecration)**
+## Phase 6: Pratistha (OS Consecration)
 
 _Goal: The "Touchless" installation of the Hypervisor using Infrastructure as Code._
 
-### **The Philosophy: Repeatable and Transient**
+### The Philosophy: Repeatable and Transient
 
 This phase embodies the **Weapon of Detachment**. We create an `answer.toml` file (Infrastructure as Code for OS installation) that:
 
@@ -805,7 +824,7 @@ Phase 8 (Srishti):    GitOps → K3s + Applications deployed
 - ❌ Proxmox VE ISO (1-2GB, available from official source)
 - ❌ SSH private keys (store in 1Password)
 
-### **Installation Steps**
+### Installation Steps
 
 #### **Step 1: Understand the Configuration Template (answer.toml)**
 
@@ -1116,18 +1135,19 @@ To force regeneration (e.g., to update with new SSH keys or password), use `FORC
 <summary>Alternative Methods (For Reference Only - Use make pratistha Instead)</summary>
 
 > **⚠️ NOTE:** These methods require manual `answer.local.toml` creation and are error-prone. The automated `make pratistha` approach (above) is strongly recommended as it handles credential injection, SSH key validation, and idempotent USB creation automatically.
-
-**Alternate A: Proxmox Auto-Install Assistant (GUI)**
-
-1. Download from [Proxmox Wiki - Automated Installation](https://pve.proxmox.com/wiki/Automated_Installation)
-2. Manually create `answer.local.toml` with your credentials (see template in Step 2)
-3. Run the assistant:
-   - Select Proxmox ISO
-   - Upload `answer.local.toml`
-   - Select USB drive
-   - Click "Create Installation Medium"
-
-**Alternate B: Manual Method (Linux/WSL)**
+>
+> **Alternate A: Proxmox Auto-Install Assistant (GUI)**
+>
+> 1. Download from [Proxmox Wiki - Automated Installation](https://pve.proxmox.com/wiki/Automated_Installation)
+> 2. Manually create `answer.local.toml` with your credentials (see template in Step 2)
+> 3. Run the assistant:
+>    - Select Proxmox ISO
+>    - Upload `answer.local.toml`
+>    - Select USB drive
+>    - Click "Create Installation Medium"
+>
+> **Alternate B: Manual Method (Linux/WSL)**
+>
 
 ```bash
 # 1. Manually create answer.local.toml from template
@@ -1175,6 +1195,144 @@ Have you removed and reinserted the USB? [y/N]:
 After reinserting the USB:
 
 1. **Verify USB:** Run `lsblk /dev/sdX` - you should see 4 partitions (sde1, sde2, sde3, sde4)
+
+### Create Proxmox VM Template (Prakriti)
+
+_Goal: Create a "golden image" template named **Prakriti** (Primal Matter). This template will be cloned by Terraform to create K3s nodes instantly. This is a one-time manual setup._
+
+> In our cosmology, the Creator (`Brahma`) from within the Realm of Creation (`Brahmaloka`) uses the Cycle (`Samsara`) to mold the Primal Matter (`Prakriti`) into the Physical Realm (`Vyom`).
+
+This procedure ensures the template is created securely with a dedicated master key for emergency access.
+
+**1. Retrieve and Upload the Prakriti Public Key**
+
+In Phase 4, you generated the `Prakriti Master Key` and saved it to 1Password. Now, we retrieve the public part of that key and upload it to the Proxmox host so it can be baked into our template.
+
+1. **Retrieve the public key from 1Password** and save it to a temporary file on your local machine:
+
+    ```bash
+    # Ensure 1Password CLI (op) is authenticated, either by `eval $(op signin)`
+    # or by exporting `OP_SERVICE_ACCOUNT_TOKEN` environment variable.
+    op read "op://Project-Brahmanda/Prakriti Master Key/public key" > /tmp/id_prakriti.pub
+    op read "op://Project-Brahmanda/Prakriti Master Key/private key" > /tmp/id_prakriti
+    chmod 600 /tmp/id_prakriti
+    ```
+
+2. **Upload the public key** to the Proxmox host's temporary directory:
+
+    ```bash
+    scp /tmp/id_prakriti* root@192.168.68.200:/tmp/
+    ```
+
+**2. Create and Configure the Template VM**
+
+SSH into Proxmox Host
+
+```bash
+ssh root@192.168.68.200
+```
+
+Run these commands from Proxmox Host to create and configure the VM on the Proxmox host.
+
+```bash
+# Destroy any previous attempt to ensure a clean slate
+qm stop 9000
+qm destroy 9000 --purge
+
+# Create the VM with the new name
+qm create 9000 --name 'prakriti-template' --memory 1024 --cores 1 --net0 virtio,bridge=vmbr0
+
+# Import the cloud image
+qm importdisk 9000 /var/lib/vz/template/qcow/noble-server-cloudimg-amd64.img local-lvm
+
+# Configure drives and boot order
+qm set 9000 --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-9000-disk-0 --ide2 local-lvm:cloudinit --boot c --bootdisk scsi0 --serial0 socket --vga serial0
+
+# Set a temporary static IP for the installation phase
+qm set 9000 --ipconfig0 ip=192.168.68.201/20,gw=192.168.68.1
+
+# ------> The CRUCIAL Step: Inject the Master Public Key <------
+qm set 9000 --sshkeys /tmp/id_prakriti.pub
+```
+
+**3. Install the Guest Agent**
+
+Now we boot the temporary VM to install the agent.
+
+1. **Start the VM:**
+
+   Run this command from Proxmox Host:
+
+    ```bash
+    qm start 9000
+    ```
+
+2. **Connect to the VM:** From your local machine, retrieve the **Prakriti Master Key** from 1Password and use it to connect to the temporary static IP.
+
+    ```bash
+    # Wait ~60 seconds for the VM to boot.
+    # We have already copied SSH Private key into Proxmox Host
+    # If you get a "host key has changed" warning, remove the old key:
+    # ssh-keygen -R 192.168.68.201
+    ssh -i /tmp/id_prakriti ubuntu@192.168.68.201
+    ```
+
+3. **Install the agent** inside the VM:
+
+    ```bash
+
+    sudo apt-get update && sudo apt-get install -y qemu-guest-agent
+
+    ```
+
+    > **NOTE:** During installation, you will see a message like `qemu-guest-agent.service is a disabled or a static unit, not starting it.`. This is expected and correct. The service will only become active on cloned VMs that are created by Terraform with the guest agent feature explicitly enabled.
+
+4. **Shutdown the VM:**
+
+    ```bash
+    sudo shutdown -h now
+    ```
+
+**4. Finalize and Clean Up**
+
+Clean the keys from Proxmox Host:
+
+1. **Clean up the temporary public key** from the Proxmox host:
+
+    ```bash
+    rm /tmp/id_prakriti
+    rm /tmp/id_prakriti.pub
+    ```
+
+2. **Reset the IP configuration:** We set it back to DHCP so that Terraform can manage IP addresses for the clones.
+
+    ```bash
+    qm set 9000 --ipconfig0 ip=dhcp
+    ```
+
+3. **Convert to Template:** This makes the VM a read-only template.
+
+    ```bash
+    qm template 9000
+    ```
+
+Clean the keys from local machine:
+
+1. **Clean up your local keys:**
+
+    ```bash
+    rm /tmp/id_prakriti
+    rm /tmp/id_prakriti.pub
+    ```
+
+**✅ Verification:**
+
+Log in to your Proxmox Web UI (`https://192.168.68.200:8006`).
+
+- You should see a new template with ID `9000` named `prakriti-template`.
+- After creating a clone from it later, you will be able to SSH in using the `Prakriti Master Key` from 1Password.
+
+This template is now ready to be used by Terraform. You can exit the Proxmox SSH session.
 
 #### **Step 5: BIOS Configuration (Flexible Timing)**
 

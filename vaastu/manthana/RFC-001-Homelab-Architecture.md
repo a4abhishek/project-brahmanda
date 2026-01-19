@@ -62,6 +62,20 @@ We will adopt a **Hybrid Cloud Overlay** architecture consisting of three layers
    - **Orchestration:** K3s (Kubernetes) running inside VMs.
    - **Justification:** Proxmox allows mixed workloads (VMs for K8s, LXC for lightweight tools). K3s is production-grade but resource-efficient.
 
+## 3. Vyom (Compute Layer) Resource Allocation
+
+To run a robust and scalable K3s cluster on the Proxmox hypervisor, the following initial VM resource allocation is proposed. This plan is based on the currently installed **48GB RAM** on the ASUS NUC.
+
+### Virtual Machine Sizing Plan
+
+| Node Role         | # of VMs | vCPUs | RAM   | Storage | Rationale                                                                                                                                                                             |
+| :---------------- | :------- | :---- | :---- | :------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Control-Plane** | 1        | 4     | 8 GB  | 64 GB   | The "brain" of the cluster. Needs sufficient CPU/RAM for the Kubernetes API server, etcd, and controller manager. 64GB storage is ample for etcd data and cached container images.           |
+| **Worker Node**   | 2        | 4     | 16 GB | 128 GB  | The "muscle" where applications run. More RAM is allocated for application workloads. More storage is provided for container images and persistent data volumes managed by Longhorn.      |
+| **Total**         | **3 VMs**  | **12**  | **40 GB** | **320 GB**| This configuration uses a significant portion of the available 48GB system RAM, leaving a modest 8GB buffer for the Proxmox host OS and other lightweight services. This is an efficient use of resources for a powerful baseline cluster. |
+
+This 1-server, 2-worker topology provides a good balance of resource usage and high availability for deployed applications.
+
 ## **Consequences**
 
 - **Positive:** "Zero Trust" networking by default. No open ports on the home ISP router. High portability (can move the NUC anywhere without breaking access).

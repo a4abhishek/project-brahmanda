@@ -2,8 +2,8 @@
 
 **Vidhana** represents the rules that govern the Brahmanda.
 
-This directory contains the **vidhana** of Project Brahmanda, which are the formal Architecture Decision Records (ADRs).
+This directory contains the **vidhana** of Project Brahmanda, which are the formal Architecture Decision Records (ADRs). An ADR is the **single source of truth** for a significant architectural decision.
 
-The word **vidhana** can be translated as "rules," "constitution," or "ordinance." Each ADR in this directory is a constitutional-level document that records a significant architectural decision.
-
-These ADRs are intentionally concise, summarizing the context, decision, and consequences. For the detailed debate, rationale, and alternative considerations behind each decision, please refer to the corresponding document in the [**manthana**](../manthana) directory.
+- **Purpose:** To record a final, binding architectural decision in a comprehensive and self-contained manner.
+- **Content:** Each ADR provides the context for the decision, the decision itself, and **the complete, canonical implementation details**, including any necessary commands or code snippets. A developer should be able to implement the decision using only the ADR as a reference.
+- **Relationship to RFCs:** While an ADR links to the corresponding RFC in the [**manthana**](../manthana) directory for the full history of the debate, it is not merely a summary. It is the final technical specification.

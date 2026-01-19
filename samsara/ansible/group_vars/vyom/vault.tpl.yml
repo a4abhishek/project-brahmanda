@@ -8,7 +8,7 @@
 
 # SSH Private Key for Vyom Nodes (Proxmox VMs)
 ssh_private_key: |
-  op://Project-Brahmanda/Vyom-Node-Key-Pair/private key
+  op://Project-Brahmanda/Prakriti Master Key/private key
 
 # K3s Cluster Token (generated during bootstrap, stored for recovery)
 # Note: This will be populated after initial K3s installation

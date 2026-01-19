@@ -129,18 +129,21 @@ Project Brahmanda adheres to the **"Asanga Shastra"** (Weapon of Detachment) - t
 ### Decision Documents
 
 **manthana/ (The Churning - RFCs)**
-- Request for Comments - Discussion and debate phase
-- Must include: Context, Scope (Current/Future/Out of Scope), Proposal, Alternatives with pros/cons, Impact, Conclusion
-- RFCs are where we **evaluate options** - keep multiple alternatives with reasoning
+- **Purpose:** The forum for debate and discussion. An RFC is created to evaluate solutions to a problem and propose most suitable one with rationale.
+- **Content:** Must include the context, problem statement, alternatives considered (with pros/cons), and a *proposed* implementation. The implementation details are for the sake of argument and may be high-level.
 
 **vidhana/ (The Constitutional Law - ADRs)**
-- Architecture Decision Records - Finalized decisions only (Vidhanas are the fundamental laws that govern the Brahmanda)
-- Must include: Context (brief), Decision (detailed with implementation), Implementation (code examples, configurations, commands), Consequences
-- ADRs are **implementation guides** - no discussion of rejected alternatives, focus on "what and how to execute"
-- **One ADR per domain, multiple RFCs can enhance it:** A single ADR can reference multiple RFCs as the solution evolves
-  - Example: ADR-003 (Secret Management) references both RFC-003 (hybrid model) and RFC-006 (automation)
-  - Git history tracks the evolution of the ADR over time
-  - Update date when ADR is amended with new RFC implementation
+- **Purpose:** The single source of truth for an architectural decision. An ADR is the final, binding "law".
+- **Content:** An ADR must be comprehensive and self-contained. It includes:
+    1.  Context: A brief summary and a link to the corresponding RFC for the full debate history.
+    2.  Decision: A clear statement of the chosen approach.
+    3.  **Implementation Details:** The complete, explicit, and canonical technical specification. This **must** include all necessary code snippets, commands (`qm`, `terraform`, etc.), and configurations. A reader should be able to implement the feature from the ADR alone.
+    4.  Consequences: The results of the decision.
+- **Principle:** It is acceptable and encouraged for an ADR to contain redundant information from an RFC if that information is part of the final implementation. An ADR should **never** refer to an RFC for implementation details.
+
+**Sarga/Visarga (The Manuals)**
+- **Purpose:** User-friendly, step-by-step "how-to" guides.
+- **Content:** These documents execute the implementation that is formally defined in the ADRs. They guide the operator through the process.
 
 **vivechana/ (Critical Examination - RCAs)**
 - Root Cause Analysis - Post-incident reviews
