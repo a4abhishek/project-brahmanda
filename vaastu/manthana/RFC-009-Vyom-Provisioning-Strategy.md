@@ -101,7 +101,7 @@ An earlier proposal suggested using the `Kshitiz` node as a CI/CD jump host. Thi
 
 Through the churning (`manthana`) process, we conceptualized a superior architecture and have named it the **"Management Outpost" pattern**. This pattern provides a dedicated, out-of-band orchestration point that is decoupled from the infrastructure it manages.
 
-While the full, detailed strategy for this new architectural plane will be defined in  a separate RFC for Brahmaloka-Orchestration-Plane-Strategy, the core principle is that a dedicated runner on the local network will be responsible for executing the `terraform apply` for the Vyom cluster. This completely resolves the circular dependency issue and is the accepted path forward.
+While the full, detailed strategy for this new architectural plane is defined in **[RFC-010: Brahmaloka (Orchestration Plane) Strategy](./RFC-011-Brahmaloka-Orchestration-Plane-Strategy.md)**, the core principle is that a dedicated runner on the local network will be responsible for executing the `terraform apply` for the Vyom cluster. This completely resolves the circular dependency issue and is the accepted path forward.
 
 ### 4.5. Prerequisite: Template Creation (Prakriti)
 
