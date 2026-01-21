@@ -90,6 +90,70 @@ provider "aws" {
 }
 ```
 
+### **Layer 2.1: Proxmox IaC User and Role**
+
+To adhere to the principle of least privilege, Terraform does not use the `root` user. A dedicated user and role with the minimum required permissions are created in Proxmox. This is a one-time manual setup.
+
+**Step 1: Create the `samsara_iac` Role**
+
+1. Navigate to `Datacenter -> Permissions -> Roles` in the Proxmox Web UI.
+2. Click `Create` and set the **Role Name** to `samsara_iac`.
+3. Grant the role the following privileges:
+    - `VM.Allocate`
+    - `VM.Audit`
+    - `VM.Clone`
+    - `VM.Config.CDROM`
+    - `VM.Config.CPU`
+    - `VM.Config.Cloudinit`
+    - `VM.Config.Disk`
+    - `VM.Config.HWType`
+    - `VM.Config.Memory`
+    - `VM.Config.Network`
+    - `VM.Config.Options`
+    - `VM.Migrate`
+    - `VM.PowerMgmt`
+    - `Pool.Allocate`
+    - `Sys.Audit`
+    - `Sys.Console`
+    - `Sys.Modify`
+    - `Datastore.AllocateSpace`
+    - `Datastore.Audit`
+4. Click `Create`.
+
+<img src="../../.github/assets/vidhana/003/proxmox-create-role.png" alt="Proxmox Create Role" width="800">
+
+**Step 2: Create the `samsara_iac` User**
+
+1. Navigate to `Datacenter -> Permissions -> Users`.
+2. Click `Add`.
+3. Set the **User name** to `samsara_iac`.
+4. Ensure the **Realm** is `Proxmox VE authentication server`.
+5. Set a strong, unique password.
+6. Click `Add`.
+
+<img src="../../.github/assets/vidhana/003/proxmox-create-user.png" alt="Proxmox Create User" width="800">
+
+**Step 3: Grant Permissions to the User**
+
+1. Navigate to `Datacenter -> Permissions`.
+2. Click `Add` and select `User Permission`.
+3. Set the **Path** to `/` (the root of the datacenter).
+4. Select the **User** `samsara_iac@pve`.
+5. Select the **Role** `samsara_iac`.
+6. Click `Add`.
+
+<img src="../../.github/assets/vidhana/003/proxmox-add-user-permissions.png" alt="Proxmox Add User Permissions" width="800">
+
+**Step 4: Store the Credentials in 1Password**
+
+1. Create a new **Login** item in the `Project-Brahmanda` vault.
+2. Set the **Title** to `Proxmox-samsara-iac`.
+3. Set the **Username** to `samsara_iac@pve`. **Note:** The `@pve` realm suffix is critical for API authentication.
+4. Save the password created in Step 2.
+5. This is the item that Terraform will reference.
+
+<img src="../../.github/assets/vidhana/003/proxmox-samsara-iac-1Password.png" alt="Proxmox Samsara IaC 1Password Item" width="800">
+
 ### **Layer 3: Discovery (The Manifest Adapter)**
 
 To solve the "Data Island" problem,Ansible will no longer rely on a static `hosts.yml`. Instead, the inventory is manifested via a stable contract.

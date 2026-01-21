@@ -25,8 +25,8 @@ variable "proxmox_node_1" {
   default     = "vyom"
 }
 
-variable "proxmox_iso" {
-  description = "The ISO image to be used for Proxmox VM creation"
+variable "template_name" {
+  description = "The name of the Proxmox template to clone for new VMs."
   type        = string
-  default     = "local:iso/debian-11.0.0-amd64-netinst.iso"
+  default     = "prakriti-template"
 }

@@ -12,7 +12,7 @@
 # Usage:
 #   ./pratistha-proxmox.sh \
 #     --iso-version 9.1-1 \
-#     --root-password "$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')" \
+#     --root-password "$(op read 'op://Private/Proxmox Brahmanda Root Password/password')" \
 #     --ssh-key-path ~/.ssh/proxmox-brahmanda.pub \
 #     --usb-device /dev/sdb \
 #     [--skip-download] \
@@ -303,7 +303,7 @@ validate_or_retrieve_password() {
   if [[ -z "$ROOT_PASSWORD" ]]; then
     info "Root password not provided. Retrieving from 1Password..."
     
-    ROOT_PASSWORD=$(op read "op://Project-Brahmanda/Proxmox Brahmanda Root Password/password")
+    ROOT_PASSWORD=$(op read "op://Private/Proxmox Brahmanda Root Password/password")
     [[ -n "$ROOT_PASSWORD" ]] || die "Failed to retrieve password from 1Password"
   fi
   

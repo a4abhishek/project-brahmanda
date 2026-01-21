@@ -924,7 +924,8 @@ cat ~/.ssh/proxmox-brahmanda.pub
 
 **3a. Store Root Password:**
 
-- Open 1Password → Project-Brahmanda vault
+- Open 1Password → Private vault
+  > **NOTE:** This is a very sensitive credential, we use a separate user in Project-Brahmanda vault for IaaC. See [ADR-003-secret-management.md](vidhana/ADR-003-secret-management.md) for more details.
 - New Item → **Password** type
 - Title: `Proxmox Brahmanda Root Password`
 - Password field: Paste the generated password
@@ -932,7 +933,8 @@ cat ~/.ssh/proxmox-brahmanda.pub
 
 **3b. Store SSH Private Key:**
 
-- Open 1Password → Project-Brahmanda vault
+- Open 1Password → Private vault
+  > **NOTE:** This is another very sensitive credential. Keeping it in Private Vault ensures that even if the CI/CD service account were compromised, the attacker would not gain root access to the Proxmox hypervisor.
 - New Item → **SSH Key** type
 - Title: `Proxmox Brahmanda Root SSH Key`
 - Paste contents of `~/.ssh/proxmox-brahmanda` (private key)
@@ -942,8 +944,8 @@ cat ~/.ssh/proxmox-brahmanda.pub
 
 ```bash
 # Verify credentials stored in 1Password
-op read "op://Project-Brahmanda/Proxmox Brahmanda Root Password/password"
-op read "op://Project-Brahmanda/Proxmox Brahmanda Root SSH Key/private key"
+op read "op://Private/Proxmox Brahmanda Root Password/password"
+op read "op://Private/Proxmox Brahmanda Root SSH Key/private key"
 ```
 
 **💡 TIP:** 1Password SSH agent can automatically provide the key when you SSH - no need to specify `-i` flag. Configure 1Password SSH agent if not already.
@@ -1054,7 +1056,7 @@ usbipd detach --busid 2-1
 
 ```bash
 make pratistha ISO_VERSION=9.1-1 \
-  ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')" \
+  ROOT_PASSWORD="$(op read 'op://Private/Proxmox Brahmanda Root Password/password')" \
   SSH_KEY_PATH=~/.ssh/proxmox-brahmanda.pub \
   USB_DEVICE=/dev/sdX
 ```
@@ -1073,7 +1075,7 @@ This automates:
 ```bash
 # Complete command with all options (actual command used for this deployment)
 make pratistha ISO_VERSION=9.1-1 \
-  ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')" \
+  ROOT_PASSWORD="$(op read 'op://Private/Proxmox Brahmanda Root Password/password')" \
   SSH_KEY_PATH=~/.ssh/proxmox-brahmanda.pub \
   USB_DEVICE=/dev/sde \
   SKIP_DOWNLOAD=true \
@@ -1088,30 +1090,30 @@ make pratistha ISO_VERSION=9.1-1 \
 # Replace /dev/sdX with YOUR USB device from lsblk
 lsblk  # Identify USB device
 make pratistha \
-  ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')" \
+  ROOT_PASSWORD="$(op read 'op://Private/Proxmox Brahmanda Root Password/password')" \
   USB_DEVICE=/dev/sdX
 
 # Example 2: Re-create USB with existing ISO (skip download)
 make pratistha \
-  ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')" \
+  ROOT_PASSWORD="$(op read 'op://Private/Proxmox Brahmanda Root Password/password')" \
   SSH_KEY_PATH=~/.ssh/proxmox-brahmanda.pub \
   USB_DEVICE=/dev/sdX \
   SKIP_DOWNLOAD=true
 
 # Example 3: Force regeneration even if USB is already bootable
 make pratistha \
-  ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')" \
+  ROOT_PASSWORD="$(op read 'op://Private/Proxmox Brahmanda Root Password/password')" \
   USB_DEVICE=/dev/sdX \
   FORCE=true
 
 # Example 4: Use different Proxmox version
 make pratistha \
   ISO_VERSION=8.2-1 \
-  ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')" \
+  ROOT_PASSWORD="$(op read 'op://Private/Proxmox Brahmanda Root Password/password')" \
   USB_DEVICE=/dev/sdX
 
 # Example 5: Password already in environment
-export PROXMOX_ROOT_PASSWORD="$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')"
+export PROXMOX_ROOT_PASSWORD="$(op read 'op://Private/Proxmox Brahmanda Root Password/password')"
 make pratistha ROOT_PASSWORD="$PROXMOX_ROOT_PASSWORD" USB_DEVICE=/dev/sdX
 ```
 
@@ -1487,8 +1489,8 @@ Password: [Retrieve from 1Password: "Proxmox Brahmanda Root Password"]
 **💡 TIP:** Use 1Password CLI to copy password directly:
 
 ```bash
-op read "op://Project-Brahmanda/Proxmox Brahmanda Root Password/password" | pbcopy  # macOS
-op read "op://Project-Brahmanda/Proxmox Brahmanda Root Password/password" | clip     # Windows/WSL
+op read "op://Private/Proxmox Brahmanda Root Password/password" | pbcopy  # macOS
+op read "op://Private/Proxmox Brahmanda Root Password/password" | clip     # Windows/WSL
 ```
 
 **📋 Subscription Notice (Normal - Not an Error)**

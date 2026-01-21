@@ -249,7 +249,7 @@ pratistha:
 	@if [ -z "$(USB_DEVICE)" ]; then \
 		echo "ERROR: USB_DEVICE parameter required."; \
 		echo "Usage: make pratistha USB_DEVICE=/dev/sdX [ISO_VERSION=9.1-1] [ROOT_PASSWORD=...] [SSH_KEY_PATH=...]"; \
-		echo "Example: make pratistha USB_DEVICE=/dev/sdb ROOT_PASSWORD=\$$(op read 'op://Project-Brahmanda/Proxmox Brahmanda Root Password/password')"; \
+		echo "Example: make pratistha USB_DEVICE=/dev/sdb ROOT_PASSWORD=\$$(op read 'op://Private/Proxmox Brahmanda Root Password/password')"; \
 		exit 1; \
 	fi
 	@chmod +x scripts/pratistha-proxmox.sh
