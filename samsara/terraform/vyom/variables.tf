@@ -22,7 +22,7 @@ variable "proxmox_endpoint" {
 variable "proxmox_node_1" {
   description = "The First Proxmox node name where resources will be created"
   type        = string
-  default     = "vyom"
+  default     = "proxmox"
 }
 
 variable "template_name" {

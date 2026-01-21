@@ -6,7 +6,7 @@ terraform {
       source = "1Password/onepassword"
     }
     proxmox = {
-      source = "Telmate/proxmox"
+      source = "bpg/proxmox"
     }
   }
 

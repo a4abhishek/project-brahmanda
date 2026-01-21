@@ -1,7 +1,13 @@
 # 1Password Provider Configuration
 provider "onepassword" {
-  # We'll use OP_SERVICE_ACCOUNT_TOKEN environment variable for authentication
-  # This will ensure accessability of 1Password secrets for Terraform as well as op CLI.
+}
+
+# Proxmox Provider Configuration
+provider "proxmox" {
+  endpoint = var.proxmox_endpoint
+  username  = data.onepassword_item.proxmox_credentials.username
+  password  = data.onepassword_item.proxmox_credentials.password
+  insecure  = true
 }
 
 data "onepassword_item" "proxmox_credentials" {
@@ -9,84 +15,97 @@ data "onepassword_item" "proxmox_credentials" {
   title = "Proxmox-samsara-iac"
 }
 
-# Proxmox Provider Configuration
-provider "proxmox" {
-  pm_api_url      = "${var.proxmox_endpoint}/api2/json"
-  pm_user         = data.onepassword_item.proxmox_credentials.username
-  pm_password     = data.onepassword_item.proxmox_credentials.password
-  pm_tls_insecure = true
+# --- Vyom Cluster Resources ---
+
+# 1. K3s Control-Plane Node
+resource "proxmox_virtual_environment_vm" "control_plane" {
+  name      = "vyom-control-plane-1"
+  node_name = var.proxmox_node_1
+  vm_id     = local.nodes.control_plane.ip_end
+
+  agent {
+    enabled = true
+  }
+
+  clone {
+    vm_id = local.template_vm_id
+    full  = true
+  }
+
+  cpu {
+    cores = local.nodes.control_plane.cores
+  }
+
+  memory {
+    dedicated = local.nodes.control_plane.memory
+  }
+
+  network_device {
+    bridge = "vmbr0"
+    model  = "virtio"
+  }
+
+  disk {
+    interface    = "virtio0"
+    datastore_id = "local-lvm"
+    size         = local.nodes.control_plane.disk
+    iothread     = true
+    discard      = "on"
+  }
+
+  initialization {
+    ip_config {
+      ipv4 {
+        address = "${local.cluster_ip_base}.${local.nodes.control_plane.ip_end}/${local.network_cidr}"
+        gateway = local.network_gateway
+      }
+    }
+  }
 }
 
+# 2. K3s Worker Nodes
+resource "proxmox_virtual_environment_vm" "worker" {
+  count     = local.nodes.worker.count
+  name      = "vyom-worker-${count.index + 1}"
+  node_name = var.proxmox_node_1
+  vm_id     = local.nodes.worker.ip_end + count.index
 
-# --- Vyom Cluster Resources ---                                                                                                                                  
+  agent {
+    enabled = true
+  }
 
-# 1. K3s Control-Plane Node                                                                                                                                       
-resource "proxmox_vm_qemu" "control_plane" {
-  # VM General Settings                                                                                                                                           
-  name        = "vyom-control-plane-1"
-  target_node = var.proxmox_node_1
-  clone       = var.template_name
+  clone {
+    vm_id = local.template_vm_id
+    full  = true
+  }
 
-  # VM Resources                                                                                                                                                  
-  cores   = 4
-  sockets = 1
-  memory  = 8192 # 8 GB                                                                                                                                           
+  cpu {
+    cores = local.nodes.worker.cores
+  }
 
-  # VM OS and Boot Settings                                                                                                                                       
-  os_type = "cloud-init"
-  agent   = 1 # Enable QEMU Guest Agent                                                                                                                           
+  memory {
+    dedicated = local.nodes.worker.memory
+  }
 
-  # Network Interface                                                                                                                                             
-  network {
-    model  = "virtio"
+  network_device {
     bridge = "vmbr0"
-  }
-
-  # Cloud-Init Configuration                                                                                                                                      
-  ipconfig0 = "ip=192.168.68.210/20,gw=192.168.68.1"
-  # Note: The SSH keys are already baked into the template, so we don't need to specify them here.                                                                
-
-  # Disk Configuration                                                                                                                                            
-  scsihw = "virtio-scsi-pci"
-  disk {
-    type    = "scsi"
-    storage = "local-lvm"
-    size    = "64G"
-  }
-}
-
-# 2. K3s Worker Nodes                                                                                                                                             
-resource "proxmox_vm_qemu" "worker" {
-  count = 2
-
-  # VM General Settings                                                                                                                                           
-  name        = "vyom-worker-${count.index + 1}"
-  target_node = var.proxmox_node_1
-  clone       = var.template_name
-
-  # VM Resources                                                                                                                                                  
-  cores   = 4
-  sockets = 1
-  memory  = 16384 # 16 GB                                                                                                                                         
-
-  # VM OS and Boot Settings                                                                                                                                       
-  os_type = "cloud-init"
-  agent   = 1 # Enable QEMU Guest Agent                                                                                                                           
-
-  # Network Interface                                                                                                                                             
-  network {
     model  = "virtio"
-    bridge = "vmbr0"
   }
 
-  # Cloud-Init Configuration (assign IPs sequentially)                                                                                                            
-  ipconfig0 = "ip=192.168.68.21${count.index + 1}/20,gw=192.168.68.1"
-
-  # Disk Configuration                                                                                                                                            
-  scsihw = "virtio-scsi-pci"
   disk {
-    type    = "scsi"
-    storage = "local-lvm"
-    size    = "128G"
+    datastore_id = "local-lvm"
+    size         = local.nodes.worker.disk
+    interface    = "virtio0"
+    iothread     = true
+    discard      = "on"
+  }
+
+  initialization {
+    ip_config {
+      ipv4 {
+        address = "${local.cluster_ip_base}.${local.nodes.worker.ip_end + count.index}/${local.network_cidr}"
+        gateway = local.network_gateway
+      }
+    }
   }
 }
