@@ -1,0 +1,23 @@
+# 1. Cluster Identity
+k3s_cluster_state: installed
+k3s_version: v1.35.0+k3s1      # Pin k3s version
+
+# 2. Networking
+k3s_node_ip: "{{ ansible_default_ipv4.address }}"  # Ansible Magic Variable for primary IP
+k3s_flannel_iface: "eth0"                          # Default interface for Vyom VMs
+
+# My first goal is Education second is Uptime, so I will keep it simple as off now.
+# Later when I add more masters, I will learn to migrate to etcd while having a Disaster Recovery plan.
+k3s_etcd_datastore: false
+
+# [This will be configured via the ansible Playbook]
+# # 4. Sanitation
+# # Don't install Traefik/ServiceLB by default (We will do this via GitOps/ArgoCD)
+# k3s_server:
+#   disable:
+#     - traefik
+#     - servicelb
+#   # Secure the API Server
+#   tls-san:
+#     - "k3s.brahmanda.local"
+#     - "10.100.0.11"

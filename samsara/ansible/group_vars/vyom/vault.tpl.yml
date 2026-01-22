@@ -6,11 +6,18 @@
 # This template uses 1Password secret references (op://)
 # Run `make nidhi-tirodhana VAULT=vyom` to generate the encrypted vault.yml
 
-# SSH Private Key for Vyom Nodes (Proxmox VMs)
-ssh_private_key: |
-  op://Project-Brahmanda/Prakriti Master Key/private key
+# 1. Cluster Identity
 
-# K3s Cluster Token (generated during bootstrap, stored for recovery)
+# K3s Cluster Token (generated during bootstrap)
 # Note: This will be populated after initial K3s installation
-# k3s_token: |
-#   op: //Project-Brahmanda/K3s-Cluster-Tokens/server-token
+k3s_token: "op://Project-Brahmanda/K3s-Cluster-Token/password"
+
+# 2. Nebula Configuration for Vyom Nodes
+nebula_ca_crt: |
+  op://Project-Brahmanda/Nebula-CA-Root-Certificate/ca.crt
+
+nebula_node_crt: |
+  op://Project-Brahmanda/Nebula-Vyom-Nodes-Certificate/vyom-nodes.crt
+
+nebula_node_key: |
+  op://Project-Brahmanda/Nebula-Vyom-Nodes-Certificate/vyom-nodes.key

@@ -85,7 +85,7 @@ help:
 	@echo "                           Example: make shuddhi USB_DEVICE=/dev/sdb FORMAT=fat32 LABEL=\"USB_DRIVE\""
 	@echo "                           Example: make samskara KEEP_POPUP=true  # Preserve popup"
 
-init: install_tools check_auth install-ansible-collections
+init: install_tools check_auth install-ansible-dependencies
 	@echo "✅ Environment is initialized and ready."
 
 # --- Vault Management ---
@@ -98,9 +98,10 @@ install-python-requirements:
 	fi
 	@.venv/bin/pip install -q -r requirements.txt
 
-install-ansible-collections:
-	@echo "Installing Ansible collections..."
+install-ansible-dependencies:
+	@echo "Installing Ansible roles and collections..."
 	@ansible-galaxy collection install community.general
+	@ansible-galaxy role install utkuozdemir.nebula
 
 nidhi-tirodhana: install-python-requirements
 	@chmod +x scripts/get-vault-password.sh
@@ -341,7 +342,7 @@ kshitiz:
 		}; \
 		trap cleanup EXIT; \
 		echo "INFO: Materializing SSH key for Kshitiz..."; \
-		op read "op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key" > "$$KEY_FILE"; \
+		op read "op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
 		chmod 600 "$$KEY_FILE"; \
 		echo "INFO: Running Ansible to configure the Lighthouse..."; \
 		(cd samsara/ansible && \
@@ -355,29 +356,29 @@ kshitiz:
 vyom:
 	@echo "🏠  Provisioning Vyom (Compute Layer)..."
 	@echo "INFO: Running Terraform for the Proxmox VMs..."
-	(cd samsara/terraform/vyom && terraform init && terraform apply -auto-approve)
+	(cd samsara/terraform/vyom && terraform init -upgrade && terraform apply -auto-approve)
 
 	@echo "INFO: Preparing to configure Vyom nodes with Ansible..."
 	@# This follows the same robust cleanup pattern as the kshitiz target
 	@/bin/bash -c ' \
 		set -e; \
-		KEY_FILE="/tmp/vyom_ssh_key_$$$$"; \
+		KEY_FILE="/tmp/prakriti_master_key_$$$$"; \
 		cleanup() { \
 			echo "INFO: Cleaning up temporary SSH key for Vyom..."; \
 			rm -f "$$KEY_FILE"; \
 		}; \
 		trap cleanup EXIT; \
-		echo "INFO: Materializing SSH key for Vyom..."; \
-		op read "op://Project-Brahmanda/Vyom-Node-SSH-Key/private key" > "$$KEY_FILE"; \
+		echo "INFO: Materializing Prakriti Master Key for Vyom..."; \
+		op read "op://Project-Brahmanda/Prakriti Master Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
 		chmod 600 "$$KEY_FILE"; \
 		echo "INFO: Running Ansible to bootstrap the Kubernetes cluster..."; \
 		(cd samsara/ansible && \
-			$(ANSIBLE_ENV) ansible-playbook playbooks/02-bootstrap-cluster.yml \
+			$(ANSIBLE_ENV) ansible-playbook playbooks/02-bootstrap-vyom.yml \
 			--private-key="$$KEY_FILE" \
 			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
 		); \
 	'
-	@echo "SUCCESS: Vyom has been provisioned."
+	@echo "SUCCESS: Vyom has been provisioned and configured."
 
 pralaya:
 	@echo "🔥  Invoking Pralaya (Dissolution)..."

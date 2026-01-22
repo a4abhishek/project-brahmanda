@@ -39,6 +39,8 @@ To bridge the gap between Provisioning and Configuration, we adopt the **Manifes
 
 To securely authenticate Ansible against the discovered hosts without storing private keys on disk, we will use the **Makefile** as an orchestrator to manage ephemeral key files.
 
+> **💡 CRITICAL FORMAT NOTE:** When retrieving SSH private keys from 1Password via the CLI (`op read`), always append `?ssh-format=openssh` to the secret reference (e.g., `op://.../private key?ssh-format=openssh`). 1Password standardizes keys stored in structured fields to PKCS#8 PEM format, which modern OpenSSH clients (especially for Ed25519 keys) may reject as "invalid format". This query parameter forces the CLI to convert the key back to the expected OpenSSH format on-the-fly.
+
 ## **Implementation**
 
 The implementation follows the **Samsara Lifecycle**, moving from authoritative secrets to provisioning, discovery, and finally configuration.

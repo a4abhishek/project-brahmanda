@@ -618,16 +618,26 @@ op read "op://Project-Brahmanda/Prakriti Master Key/private key"
 op read "op://Project-Brahmanda/Prakriti Master Key/public key"
 ```
 
-#### **K3s Cluster Tokens**
+#### **K3s Cluster Token (The Gatekeeper)**
 
-K3s tokens are automatically generated during cluster bootstrap phase. After successful K3s initialization:
+We adhere to a **Declarative Secret Strategy**. We do not rely on the cluster to auto-generate tokens.
 
-1. Capture the tokens from the cluster.
-2. Store them in Ansible Vault for disaster recovery (primary storage).
-3. **Optionally**, back them up in 1Password:
-   - Create a new **Secure Note** item titled `K3s-Cluster-Tokens`
-   - Store the server token and agent token as separate fields
-   - This provides an additional recovery layer if Ansible Vault password is lost
+1. **Pre-Generation:** Generate a high-entropy token manually on Day 0:
+
+   ```bash
+   openssl rand -hex 32
+   ```
+
+2. **Consecration:** Store this token immediately in **1Password** in a Password item named `K3s-Cluster-Token`.
+3. **Injection:** * Reference is added in **Vyom Vault Template** (`samsara/ansible/group_vars/vyom/vault.tpl.yml`):
+
+```yaml
+vault_k3s_token: "op://Project-Brahmanda/K3s-Cluster-Token/password"
+```
+
+- Run `make nidhi-tirodhana VAULT=vyom` (Concealment). This reads the template, fetches the token from 1Password, and seals it into the encrypted `vault.yml`.
+
+_Result:_ The Ansible playbook can now inject this deterministic token into the K3s Master configuration during bootstrap, ensuring the cluster identity is survivable across rebuilds (_Srishti/Pralaya cycles_).
 
 ## Phase 5: Adhisthana (The Foundation)
 

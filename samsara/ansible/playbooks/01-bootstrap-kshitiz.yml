@@ -2,10 +2,7 @@
 - name: Bootstrap Kshitiz (Edge) Lighthouse
   hosts: kshitiz
   become: true  # This tells Ansible to use 'sudo' for the tasks.
-  # The 'vars_files' section is commented out because Ansible automatically
-  # loads variables from 'group_vars/kshitiz/'. The 'vault.yml' file will be
-  # loaded automatically.
-  vars_files:
+  vars_files: # This tells ansible exactly in which order to load variable files. It is a good practice.
     - ../group_vars/kshitiz/vars.yml
     - ../group_vars/kshitiz/vault.yml
 

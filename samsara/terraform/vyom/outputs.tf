@@ -35,8 +35,8 @@ locals {
     for w in proxmox_virtual_environment_vm.worker : {
       name         = w.name
       ansible_host = split("/", w.initialization[0].ip_config[0].ipv4[0].address)[0]
-      ansible_user = "ubuntu"
-      ansible_port = 22
+      ansible_user = "ubuntu" # Comes from Prakriti template
+      ansible_port = 22       # Default SSH port
     }
   ]
 }
@@ -46,21 +46,19 @@ locals {
 # This file serves as a clean interface between Terraform and other tools.
 resource "local_file" "automation_manifest" {
   content = jsonencode({
-    kshitiz = {
-      k3s_master = {
-        hosts = [
-          {
-            name         = proxmox_virtual_environment_vm.control_plane.name
-            ansible_host = split("/", proxmox_virtual_environment_vm.control_plane.initialization[0].ip_config[0].ipv4[0].address)[0]
-            ansible_user = "ubuntu" # Comes from Prakriti template
-            ansible_port = 22       # Default SSH port
-          }
-        ]
-      }
+    vyom_control_plane = {
+      hosts = [
+        {
+          name         = proxmox_virtual_environment_vm.control_plane.name
+          ansible_host = split("/", proxmox_virtual_environment_vm.control_plane.initialization[0].ip_config[0].ipv4[0].address)[0]
+          ansible_user = "ubuntu" # Comes from Prakriti template
+          ansible_port = 22       # Default SSH port
+        }
+      ]
+    }
 
-      k3s_worker = {
-        hosts = local.k3s_worker_hosts
-      }
+    vyom_workers = {
+      hosts = local.k3s_worker_hosts
     }
   })
   filename = "${path.module}/manifest.json"

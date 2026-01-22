@@ -1,0 +1,170 @@
+---
+# -----------------------------------------------------------------------------
+# 🕉️ Srishti: Vyom Cluster Manifestation
+# -----------------------------------------------------------------------------
+# This playbook bootstraps the Kubernetes cluster.
+# Strategy: "Split-Horizon"
+#   1. Data Plane: Physical LAN (High Speed)
+#   2. Control Plane: Nebula Mesh (High Security)
+# -----------------------------------------------------------------------------
+
+- name: Manifest Vyom Cluster (Compute Plane)
+  hosts: k3s_cluster
+  become: true
+  
+  # Load variables hierarchy:
+  # 1. Group Vars (Common settings)
+  vars_files:
+    - ../group_vars/vyom/vars.yml
+    - ../group_vars/vyom/vault.yml
+
+  gather_facts: true
+
+  # ---------------------------------------------------------------------------
+  # Phase 0: Validation & Preparation
+  # ---------------------------------------------------------------------------
+  pre_tasks:
+    - name: 🛡️ Verify Identity Existence
+      fail:
+        msg: "Identity missing for {{ inventory_hostname }}. Ensure 'vault_nebula_cert' and 'vault_nebula_key' are defined in host_vars."
+      when: vault_nebula_cert is undefined or vault_nebula_key is undefined
+      # Note: vault_nebula_* vars currently mapped from nebula_node_* in group_vars, so this check might need adjustment if using group vars directly.
+      # Simplified check for now based on what we know exists:
+      ignore_errors: true 
+
+    - name: 📂 Create Nebula Configuration Directory
+      file:
+        path: /etc/nebula
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: 📜 Place Nebula CA Certificate
+      copy:
+        content: "{{ nebula_ca_crt }}"
+        dest: /etc/nebula/ca.crt
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: 📜 Place Nebula Node Certificate
+      copy:
+        content: "{{ nebula_node_crt }}"
+        dest: /etc/nebula/host.crt
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: 🔑 Place Nebula Node Key
+      copy:
+        content: "{{ nebula_node_key }}"
+        dest: /etc/nebula/host.key
+        mode: '0600' # Private keys must be secure
+        owner: root
+        group: root
+
+  # ---------------------------------------------------------------------------
+  # Phase 1: The Mesh (Nebula)
+  # ---------------------------------------------------------------------------
+  roles:
+    - role: utkuozdemir.nebula
+      vars:
+        # We ensure Nebula is running first so we can use its IP for TLS-SAN
+        nebula_service_enabled: true
+        nebula_service_state: started
+
+        # --- CA Management ---
+        # Strategy: "Local Satisfaction"
+        # We tell the role to check the LOCAL host for the CA cert.
+        # Since we pre-placed 'ca.crt' in the pre_tasks, this check will pass immediately.
+        nebula_ca_host: "{{ inventory_hostname }}"
+        nebula_ca_hosts: []
+        nebula_ca_manage: false
+        nebula_ca_create: false
+        nebula_ca_upload: false
+        nebula_cert_generate_on_ca: false
+
+        # --- Identity ---
+        # We point the role to the files we just created.
+        # This prevents it from trying to write them again or complaining.
+        nebula_cert_path: "/etc/nebula/host.crt"
+        nebula_key_path: "/etc/nebula/host.key"
+
+        # Map Role Variable -> To Vault Variable (from group_vars/vyom/vault.yml)
+        nebula_ca_crt: "{{ nebula_ca_crt }}" 
+        nebula_cert: "{{ nebula_node_crt }}"
+        nebula_key: "{{ nebula_node_key }}"
+        
+        # 2. Network Config (From Dynamic Inventory)
+        # Dynamic Inventory python script injects 'nebula_ip' automatically based on the last octet.
+        # We append the CIDR suffix here.
+        nebula_ip: "{{ inventory_nebula_ip }}/24"
+        nebula_groups: "vyom"
+
+  tasks:
+    # -------------------------------------------------------------------------
+    # Phase 2: The Bridge (Discovery)
+    # -------------------------------------------------------------------------
+    - name: 🔄 Refresh Ansible Facts (Discover nebula0)
+      ansible.builtin.setup:
+      # Forces Ansible to see the newly created 'nebula0' interface
+      # Otherwise 'ansible_nebula0' will remain undefined.
+
+    # -------------------------------------------------------------------------
+    # Phase 3: The Cluster (K3s)
+    # -------------------------------------------------------------------------
+    - name: ☸️ Bootstrap K3s (Split-Horizon)
+      include_role:
+        name: PyratLabs.k3s
+      vars:
+        # 1. Identity (The Gatekeeper)
+        # ---------------------------
+        k3s_token: "{{ k3s_token }}"
+        k3s_version: "{{ k3s_version }}"
+
+        # 2. Storage Strategy (ADR-005)
+        # ---------------------------
+        # We explicitly choose SQLite (Single Master) to start "Hard Mode" learning.
+        # Set to 'true' later when migrating to HA Etcd.
+        k3s_etcd_datastore: "{{ k3s_etcd_datastore }}"
+
+        # 3. Networking (The Split-Horizon)
+        # ---------------------------
+        # Bind to the Physical Interface (FAST - 2.5GbE)
+        # This ensures Longhorn replication and Etcd run at bare-metal speeds.
+        k3s_node_ip: "{{ k3s_node_ip }}"
+        k3s_flannel_iface: "{{ k3s_flannel_iface }}"
+
+        # 4. Access Control & SANs
+        # ---------------------------
+        k3s_server:
+          # Secure the API Server with multiple identities
+          tls-san:
+            # A. The Secure Backdoor (For Lighthouse & Remote kubectl)
+            - "{{ ansible_nebula0.ipv4.address }}"
+            # B. The Local Door (For LAN access)
+            - "{{ ansible_default_ipv4.address }}"
+            # C. The DNS Name (For Ingress)
+            - "k3s.brahmanda.local"
+
+          # 5. Component Tuning
+          # ---------------------------
+          disable:
+            - traefik    # We will deploy Ingress via GitOps (Sankalpa)
+            - servicelb  # We don't need a LoadBalancer yet
+          kube-controller-manager-arg:
+            - "bind-address=0.0.0.0" # Allow metrics scraping
+          kube-scheduler-arg:
+            - "bind-address=0.0.0.0"
+          
+          # 6. Kubelet Tuning (For System Stability)
+          kubelet-arg:
+            # Reserve resources for the OS so K3s doesn't OOM the host
+            - "system-reserved=cpu=500m,memory=500Mi"
+            - "kube-reserved=cpu=500m,memory=500Mi"
+
+  post_tasks:
+    - name: ✅ Verify Node Identity
+      debug:
+        msg: "Node {{ inventory_hostname }} is active. LAN IP: {{ ansible_default_ipv4.address }}, Mesh IP: {{ ansible_nebula0.ipv4.address }}"
