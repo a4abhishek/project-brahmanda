@@ -40,4 +40,5 @@ samsara/proxmox/answer.local.toml
 samsara/ansible/group_vars/*/*.tmp.yml
 samsara/ansible/inventory/hosts.yml
 samsara/terraform/kshitiz/manifest.json
+samsara/terraform/vyom/manifest.json
 .venv/
