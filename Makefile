@@ -337,7 +337,21 @@ kshitiz:
 		echo "🚀  PHASE 1: Provisioning Kshitiz with Terraform..."; \
 		echo "--------------------------------------------------------------------------------"; \
 		echo ""; \
-		(cd samsara/terraform/kshitiz && terraform init && terraform apply -auto-approve); \
+		echo "INFO: Fetching R2 Backend Credentials..."; \
+		R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
+		R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
+		R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
+		if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
+			echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
+			echo "   Ensure item 'Cloudflare-Sanchay-Token' exists with fields: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT"; \
+			exit 1; \
+		fi; \
+		echo "INFO: Running Terraform for the Lightsail instance..."; \
+		(cd samsara/terraform/kshitiz && terraform init -upgrade \
+			-backend-config="access_key=$$R2_ACCESS_KEY" \
+			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
+			-backend-config="endpoint=$$R2_ENDPOINT" \
+			&& terraform apply -auto-approve); \
 		echo ""; \
 		echo "--------------------------------------------------------------------------------"; \
 		echo "🚀  PHASE 2: Configuring Kshitiz with Ansible..."; \
@@ -367,10 +381,24 @@ vyom:
 	@/bin/bash -c ' \
 		set -e; \
 		echo "--------------------------------------------------------------------------------"; \
-		echo "🚀  PHASE 1: Provisioning Virtual Machines with Terraform..."; \
+		echo "🚀  PHASE 1: Provisioning Vyom Nodes with Terraform..."; \
 		echo "--------------------------------------------------------------------------------"; \
 		echo ""; \
-		(cd samsara/terraform/vyom && terraform init -upgrade && terraform apply -auto-approve); \
+		echo "INFO: Fetching R2 Backend Credentials..."; \
+		R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
+		R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
+		R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
+		if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
+			echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
+			echo "   Ensure item 'Cloudflare-Sanchay-Token' exists with fields: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT"; \
+			exit 1; \
+		fi; \
+		echo "INFO: Running Terraform for the Proxmox VMs..."; \
+		(cd samsara/terraform/vyom && terraform init -upgrade \
+			-backend-config="access_key=$$R2_ACCESS_KEY" \
+			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
+			-backend-config="endpoint=$$R2_ENDPOINT" \
+			&& terraform apply -auto-approve); \
 		echo ""; \
 		echo "--------------------------------------------------------------------------------"; \
 		echo "🚀  PHASE 2: Configuring Vyom Cluster with Ansible..."; \
@@ -424,4 +452,3 @@ pralaya:
 	@echo "INFO: Destroying Kshitiz (Edge Layer)..."
 	#(cd samsara/terraform/kshitiz && terraform destroy -auto-approve)
 	@echo "SUCCESS: Pralaya is complete. The universe has returned to the void."
-..

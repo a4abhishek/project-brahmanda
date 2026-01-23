@@ -409,49 +409,102 @@ Generate Cloudflare credentials for Terraform state and DNS management:
 
   > **💡 TIP:** Both buckets use Standard storage to stay within R2's free tier (10GB storage, 1M Class A operations/month). Infrequent Access doesn't qualify for free tier. Once your backups exceed 10GB or you need cost optimization, consider migrating `brahmanda-sanchaya-backups` to Infrequent Access (~50% cheaper, but paid from first byte).
 
-- **Create API Token:**
+- **Create R2 API Token (S3 Compatibility):**
 
-  - In Cloudflare Dashboard, go to **My Profile** → **API Tokens** → **Create Token**.
-  - Click **Create Custom Token**.
-  - **Token name:** `Brahmanda-Sanchay-Token`
-  - **Permissions:** Click **Add** and configure:
-    - First dropdown: Select **Account**
-    - Second dropdown: Select **Workers R2 Storage**
-    - Third dropdown: Select **Edit**
-  - **Account Resources:**
-    - First dropdown: Select **Include**
-    - Second dropdown: Select your account (e.g., "Aarohini" or your Cloudflare account name)
-  - Leave **IP Address Filtering** and **TTL** sections at defaults (optional).
-  - Click **Continue to Summary**.
-  - **Verify the summary shows:** `<Your-Account-Name> - Workers R2 Storage:Edit`
-  - Click **Create Token**.
-  - **CRITICAL:** The token is shown **only once**. Do not close the page until stored in 1Password.
-  - Cloudflare will show a `curl` command to test the token—save this for verification.
+  - Opem [Cloudflare Dashboard](https://dash.cloudflare.com/), go to **Storage & databases** → **R2 object storage** → **Overview**. <br> <img src="../.github/assets/sarga/s3-secret-01-navigate-to-r2.png" alt="Navigate to R2" width="600">
+  - Click **{} Manage** in Account Details -> API Tokens. <br> <img src="../.github/assets/sarga/s3-secret-02-manage-api-tokens.png" alt="Manage API Tokens" width="600">
+  - Click **Create User API token** in User API Tokens section. <br> <img src="../.github/assets/sarga/s3-secret-03-create-api-token.png" alt="Click on Create API Token" width="600">
+  - Fill in the following details:
+    1. **Token name:** Put `Brahmanda-Sanchay-Token`
+    1. **Permissions:** Select `Object Read & Write: Allows the ability to read, write, and list objects in specific buckets.`
+    1. **Specify bucket(s):** Select `Apply to specific buckets only`. It will reveal a multi-select dropdown. Pick `brahmanda-state` bucket from the list.
+    1. **TTL:** Leave TTL as `Forever`.
+    1. Leave **Client IP Address Filtering** sections at defaults (optional).
+    1. Click **Create User API Token**.
+    <br> <img src="../.github/assets/sarga/s3-secret-04-fill-api-token-details.png" alt="Fill API Token Details" width="600">
+  - Save the credentials in 1Password.
+    > **CRITICAL:** The token details are shown **only once**. Do not close the page until stored in 1Password.
 
-  <details>
-  <summary>1Password Storage Instructions</summary>
+    <details>
+    <summary>1Password Storage Instructions</summary>
 
-  **Step 1:** Open 1Password and create a new vault named **"Project-Brahmanda"** if it doesn't exist.
+    **Step 1:** Open 1Password and create a new vault named **"Project-Brahmanda"** if it doesn't exist.
 
-  **Step 2:** Create a new **API Credential** item with these details:
+    **Step 2:** Create a new **API Credential** item with these details:
 
-  - **Title:** `Cloudflare-Sanchay-Token`
-  - **Username:** (leave blank)
-  - **Add Field → Password:** `CLOUDFLARE_API_TOKEN` → Paste the API token from Cloudflare
-  - **Add Field → Text:** `CLOUDFLARE_ACCOUNT_ID` → Paste your Cloudflare Account ID (copied earlier)
-  - **Add Field → Text:** `R2_ENDPOINT` → `https://<account-id>.r2.cloudflarestorage.com` (replace `<account-id>` with your actual Account ID)
+    - **Title:** `Cloudflare-Sanchay-Token`
+    - **Username:** (leave blank)
+    - **Add Field → Password:** `R2_SECRET_ACCESS_KEY` → Paste the `Secret Access Key` from Cloudflare.
+    - **Add Field → Text:** `R2_ACCESS_KEY_ID` → Paste the `Access Key ID` from Cloudflare.
+    - **Add Field → Text:** `R2_ENDPOINT` → `https://<account-id>.r2.cloudflarestorage.com`.
+    - **Add Field → Password:** `Token Value` → Paste the `Token Value` from Cloudflare.
+    - Save the item.
+    - Click **Finish** on Cloudflare.
 
-  **Step 3:** Save the item. You can now close the Cloudflare page.
+    **Step 3:** Save the item and Finish Cloudflare token generation:
+    - Save the item.
+    - Click **Finish** on Cloudflare.
+
+     You can now close the Cloudflare page.
+
+     <img src="../.github/assets/sarga/s3-secret-05-save-important-credentials.png" alt="Save Important Credentials" width="600">
+
+     > Don't worry. I've already removed this token from Cloudflare.
   </details>
 
   **✅ Verification:**
 
   1. Test the API token using the `curl` command provided by Cloudflare (it verifies the token works).
-  2. Run `op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/CLOUDFLARE_API_TOKEN"` to confirm it's stored correctly in 1Password.
+  2. Run `op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"` to confirm it's stored correctly in 1Password.
 
   > **💡 TIP:** Click the **▼** next to the field in 1Password and select **"Copy Secret Reference"** to get the exact path.
 
   > **💡 NOTE:** The `R2_ENDPOINT` field is stored as configuration for IaC tools. While it can be generated programmatically from the Account ID, storing it explicitly in 1Password is common practice—it makes Terraform/Ansible configurations more readable and reduces string interpolation errors.
+
+### Upstash Lease
+
+This will be used by our IaC tooling (Terraform/Ansible) to acquire a lease-based lock for synchronizing infrastructure provisioning, protecting both the underlying Infrastructure layer and the Terraform state.
+
+#### **1. Upstash Token Generation**
+
+1. Log in to the [Upstash Console](https://console.upstash.com/), and click **Create Database**.
+    <br><img src="../.github/assets/vidhana/007/upstash-01-click-create-database.png" alt="Upstash Create Database" width="600">
+2. Fill-in details:
+    - **Name:** `brahmanda-state-lock`
+    - **Primary Region:** `Mumbai, India (ap-south-1)`
+    - **Read Regions** (Optional): `Singapore (ap-southeast-1)`
+    - Click **Next**
+    <br><img src="../.github/assets/vidhana/007/upstash-02-fill-details.png" alt="Upstash Fill-in Database details" width="600">
+3. Select a Plan
+    - Leave the **Free** plan selected.
+    - Click **Next**
+    <br><img src="../.github/assets/vidhana/007/upstash-03-select-plan.png" alt="Upstash Select Plan" width="600">
+4. Verify and create
+    - Verify the presented details are correct.
+    - Click **Create**.
+    <br><img src="../.github/assets/vidhana/007/upstash-04-create-redis.png" alt="Upstash Create Redis" width="600">
+5. Save the credentials in 1Password
+    - Upstash will present the database homepage, keep it open.
+    <br><img src="../.github/assets/vidhana/007/upstash-05-secret-tokens.png" alt="Upstash Secret Tokens" width="600">
+    - In 1Password, click **New Item**, and select **Login**.
+    <br><img src="../.github/assets/vidhana/007/upstash-06-1Password-create-item.png" alt="Upstash 1Password Create Item" width="600">
+    - **Title:** `Upstash-Sanchay-Token`.
+    - Leave **username** and **password** blank.
+    - **website**(Optional): You may add the Upstash Database Homepage.
+    - Add a **Password** field named `UPSTASH_REDIS_REST_TOKEN` and save the **TOKEN** you copy from upstash page.
+    - Add a **Text** field named `UPSTASH_REDIS_REST_URL` and save the **URL** you copy from upstash page.
+    - Add a **Text** field named `PORT` and add the **Port** (usually `6379`) from upstash page.
+    - Click **Save**.
+    <br><img src="../.github/assets/vidhana/007/upstash-07-1Password-save-credentials.png" alt="Upstash 1Password Save Credentials" width="600">
+
+#### **2. Secret Storage (1Password)**
+
+Store these credentials in the Project-Brahmanda vault.
+
+- **Item Name:** Upstash Redis - Brahmanda
+- **Fields:**
+  - url: (The REST URL, e.g., <https://funny-monkey-32145.upstash.io>)
+  - token: (The long alphanumeric bearer token)
 
 ### Kshitiz - Nebula Mesh Infrastructure
 
@@ -1754,7 +1807,7 @@ _Goal: Running the automation from GitHub Actions._
        OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
        AWS_ACCESS_KEY_ID: op://Project-Brahmanda/AWS-samsara-iac/AWS_ACCESS_KEY_ID
        AWS_SECRET_ACCESS_KEY: op://Project-Brahmanda/AWS-samsara-iac/AWS_SECRET_ACCESS_KEY
-       CLOUDFLARE_API_TOKEN: op://Project-Brahmanda/Cloudflare-Sanchay-Token/CLOUDFLARE_API_TOKEN
+       R2_SECRET_ACCESS_KEY: op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY
        ANSIBLE_VAULT_PASSWORD: op://Project-Brahmanda/Ansible Vault - Samsara/password
    ```
 
@@ -1770,7 +1823,7 @@ _Goal: Running the automation from GitHub Actions._
     export: |
       AWS_ACCESS_KEY_ID=op://Project-Brahmanda/AWS-samsara-iac/AWS_ACCESS_KEY_ID
       AWS_SECRET_ACCESS_KEY=op://Project-Brahmanda/AWS-samsara-iac/AWS_SECRET_ACCESS_KEY
-      CLOUDFLARE_API_TOKEN=op://Project-Brahmanda/Cloudflare-Sanchay-Token/CLOUDFLARE_API_TOKEN
+      R2_SECRET_ACCESS_KEY=op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY
       ANSIBLE_VAULT_PASSWORD=op://Project-Brahmanda/Ansible Vault - Samsara/password
 ```
 
