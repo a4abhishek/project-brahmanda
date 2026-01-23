@@ -324,7 +324,7 @@ srishti:
 	@echo "INFO: This process will provision the Kshitiz (Edge) and Vyom (Compute) layers."
 	make kshitiz
 	make vyom
-	@echo "SUCCESS: Srishti (Creation) is complete. The Brahmanda has been manifested."
+	@echo "🕉️  SUCCESS: Srishti (Creation) is complete. The Brahmanda has been manifested."
 
 kshitiz:
 	@echo "☁️  Provisioning Kshitiz (Edge Layer)..."
@@ -351,7 +351,7 @@ kshitiz:
 			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
 		); \
 	'
-	@echo "SUCCESS: Kshitiz has been provisioned and configured."
+	@echo "🕉️  SUCCESS: Kshitiz has been manifested."
 
 vyom:
 	@echo "🏠  Provisioning Vyom (Compute Layer)..."
@@ -378,7 +378,27 @@ vyom:
 			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
 		); \
 	'
-	@echo "SUCCESS: Vyom has been provisioned and configured."
+	@echo "🕉️  SUCCESS: Vyom has been manifested."
+
+kubeconfig:
+	@echo "☸️  Fetching Kubeconfig from Vyom Control Plane..."
+	@/bin/bash -c ' \
+		set -e; \
+		KEY_FILE="/tmp/prakriti_master_key_kc_$$$$"; \
+		cleanup() { \
+			rm -f "$$KEY_FILE"; \
+		}; \
+		trap cleanup EXIT; \
+		op read "op://Project-Brahmanda/Prakriti Master Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
+		chmod 600 "$$KEY_FILE"; \
+		mkdir -p ~/.kube; \
+		ssh -i "$$KEY_FILE" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@192.168.68.210 "sudo cat /etc/rancher/k3s/k3s.yaml" > ~/.kube/config-vyom.tmp; \
+		sed "s/127.0.0.1/192.168.68.210/g" ~/.kube/config-vyom.tmp > ~/.kube/config-vyom; \
+		rm ~/.kube/config-vyom.tmp; \
+	'
+	@echo "✅ Kubeconfig saved to ~/.kube/config-vyom"
+	@echo "Usage: export KUBECONFIG=~/.kube/config-vyom"
+	@echo "       kubectl get nodes"
 
 pralaya:
 	@echo "🔥  Invoking Pralaya (Dissolution)..."

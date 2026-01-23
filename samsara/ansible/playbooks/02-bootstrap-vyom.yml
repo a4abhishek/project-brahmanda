@@ -11,7 +11,7 @@
 - name: Manifest Vyom Cluster (Compute Plane)
   hosts: k3s_cluster
   become: true
-  
+
   # Load variables hierarchy:
   # 1. Group Vars (Common settings)
   vars_files:
@@ -26,7 +26,7 @@
   vars:
     # --- Nebula Configuration ---
     nebula_version: "1.10.0" # Force this version
-    
+
     # Identity (We pre-placed these files)
     pki:
       ca: /etc/nebula/ca.crt
@@ -35,7 +35,7 @@
 
     # Lighthouse Configuration
     lighthouses: ["10.42.0.1"]
-    
+
     lighthouse:
       am_lighthouse: false
       interval: 60
@@ -50,11 +50,11 @@
     listen:
       host: 0.0.0.0
       port: 4242
-    
+
     tun:
       disabled: false
-      dev: nebula0
-      
+      dev: nebula1 # Default. But explicitly set interface name for consistency
+
     firewall:
       outbound:
         - port: any
@@ -78,7 +78,7 @@
       when: vault_nebula_cert is undefined or vault_nebula_key is undefined
       # Note: vault_nebula_* vars currently mapped from nebula_node_* in group_vars, so this check might need adjustment if using group vars directly.
       # Simplified check for now based on what we know exists:
-      ignore_errors: true 
+      ignore_errors: true
 
     - name: 🧹 Cleanup Old Nebula Binaries (Force Upgrade)
       file:
@@ -145,27 +145,15 @@
     - name: ☸️ Bootstrap K3s (Split-Horizon)
       include_role:
         name: xanmanning.k3s
+        apply:
+          become: true
       vars:
-        # 1. Identity (The Gatekeeper)
-        # ---------------------------
-        k3s_token: "{{ k3s_token }}"
-        k3s_version: "{{ k3s_version }}"
+        k3s_become: true
 
-        # 2. Storage Strategy (ADR-005)
-        # ---------------------------
-        # We explicitly choose SQLite (Single Master) to start "Hard Mode" learning.
-        # Set to 'true' later when migrating to HA Etcd.
-        k3s_etcd_datastore: "{{ k3s_etcd_datastore }}"
-
-        # 3. Networking (The Split-Horizon)
-        # ---------------------------
-        # Bind to the Physical Interface (FAST - 2.5GbE)
-        # This ensures Longhorn replication and Etcd run at bare-metal speeds.
+        # Network Binding (Fast Lane)
         k3s_node_ip: "{{ k3s_node_ip }}"
         k3s_flannel_iface: "{{ k3s_flannel_iface }}"
 
-        # 4. Access Control & SANs
-        # ---------------------------
         k3s_server:
           # Secure the API Server with multiple identities
           tls-san:
@@ -185,7 +173,7 @@
             - "bind-address=0.0.0.0" # Allow metrics scraping
           kube-scheduler-arg:
             - "bind-address=0.0.0.0"
-          
+
           # 6. Kubelet Tuning (For System Stability)
           kubelet-arg:
             # Reserve resources for the OS so K3s doesn't OOM the host
@@ -195,4 +183,4 @@
   post_tasks:
     - name: ✅ Verify Node Identity
       debug:
-        msg: "Node {{ inventory_hostname }} is active. LAN IP: {{ ansible_default_ipv4.address }}, Mesh IP: {{ ansible_nebula0.ipv4.address }}"
+        msg: "Node {{ inventory_hostname }} active. LAN: {{ ansible_default_ipv4.address }}, Mesh: {{ ansible_nebula1.ipv4.address | default('Unknown') }}"
