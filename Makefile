@@ -100,8 +100,8 @@ install-python-requirements:
 
 install-ansible-dependencies:
 	@echo "Installing Ansible roles and collections..."
-	@ansible-galaxy collection install community.general
-	@ansible-galaxy role install utkuozdemir.nebula
+	@ansible-galaxy collection install community.general ansible.posix
+	@ansible-galaxy role install trozz.ansible_nebula xanmanning.k3s
 
 nidhi-tirodhana: install-python-requirements
 	@chmod +x scripts/get-vault-password.sh
