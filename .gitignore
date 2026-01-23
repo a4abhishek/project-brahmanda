@@ -16,6 +16,8 @@ terraform.rc
 # Ansible
 *.retry
 ansible.log
+**/__pycache__/
+*.py[cod]
 
 # IDE
 .vscode/

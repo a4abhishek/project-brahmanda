@@ -112,6 +112,8 @@ To adhere to the principle of least privilege, Terraform does not use the `root`
     - `VM.Config.Memory`
     - `VM.Config.Network`
     - `VM.Config.Options`
+    - `VM.GuestAgent.Audit`
+    - `VM.GuestAgent.Unrestricted`
     - `VM.Migrate`
     - `VM.PowerMgmt`
     - `Pool.Allocate`

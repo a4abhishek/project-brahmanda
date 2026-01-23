@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
 
+# TODO: Refactor for Genericity
+# Currently, this script is too aware of the specific origin and internal structure 
+# of manifests (e.g., hardcoded logic for vyom_control_plane, k3s_cluster parent groups, 
+# and IP derivation). 
+# Future improvement: Use environment variables or a more generic tagging system in 
+# manifest.json to control group membership and variable injection without 
+# module-specific code.
+
 import json
 import argparse
 import os

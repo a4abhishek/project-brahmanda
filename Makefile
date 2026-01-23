@@ -165,8 +165,12 @@ nidhi-avirbhava:
 		echo "✅ All treasure repositories manifested successfully"; \
 	else \
 		echo "💎🔓 Nidhi-Avirbhava: Manifesting $(VAULT) treasury..."; \
-		(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault decrypt "group_vars/$(VAULT)/vault.yml" --vault-password-file ../../scripts/get-vault-password.sh); \
-		echo "✅ $(VAULT) treasury manifested successfully"; \
+		if [ -f "samsara/ansible/group_vars/$(VAULT)/vault.yml" ] && head -n1 "samsara/ansible/group_vars/$(VAULT)/vault.yml" | grep -q '\$$ANSIBLE_VAULT'; then \
+			(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault decrypt "group_vars/$(VAULT)/vault.yml" --vault-password-file ../../scripts/get-vault-password.sh); \
+			echo "✅ $(VAULT) treasury manifested successfully"; \
+		else \
+			echo "⚠️  $(VAULT) vault not found or already decrypted (skipping)"; \
+		fi; \
 	fi
 
 samshodhana:
@@ -322,19 +326,24 @@ mukti:
 srishti:
 	@echo "🕉️  Manifesting the Brahmanda..."
 	@echo "INFO: This process will provision the Kshitiz (Edge) and Vyom (Compute) layers."
-	make kshitiz
-	make vyom
+	@$(MAKE) kshitiz && $(MAKE) vyom
 	@echo "🕉️  SUCCESS: Srishti (Creation) is complete. The Brahmanda has been manifested."
 
 kshitiz:
 	@echo "☁️  Provisioning Kshitiz (Edge Layer)..."
-	@echo "INFO: Running Terraform for the Lightsail instance..."
-	(cd samsara/terraform/kshitiz && terraform init && terraform apply -auto-approve)
-
-	@echo "INFO: Preparing to configure the Lighthouse with Ansible..."
-	@# Use a self-contained shell script block with a trap for robust cleanup
 	@/bin/bash -c ' \
 		set -e; \
+		echo "--------------------------------------------------------------------------------"; \
+		echo "🚀  PHASE 1: Provisioning Kshitiz with Terraform..."; \
+		echo "--------------------------------------------------------------------------------"; \
+		echo ""; \
+		(cd samsara/terraform/kshitiz && terraform init && terraform apply -auto-approve); \
+		echo ""; \
+		echo "--------------------------------------------------------------------------------"; \
+		echo "🚀  PHASE 2: Configuring Kshitiz with Ansible..."; \
+		echo "--------------------------------------------------------------------------------"; \
+		echo ""; \
+		echo "INFO: Preparing to configure Kshitiz..."; \
 		KEY_FILE="/tmp/kshitiz_ssh_key_$$$$"; \
 		cleanup() { \
 			echo "INFO: Cleaning up temporary SSH key..."; \
@@ -344,7 +353,7 @@ kshitiz:
 		echo "INFO: Materializing SSH key for Kshitiz..."; \
 		op read "op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
 		chmod 600 "$$KEY_FILE"; \
-		echo "INFO: Running Ansible to configure the Lighthouse..."; \
+		echo "INFO: Running Ansible to configure Kshitiz..."; \
 		(cd samsara/ansible && \
 			$(ANSIBLE_ENV) ansible-playbook playbooks/01-bootstrap-kshitiz.yml \
 			--private-key="$$KEY_FILE" \
@@ -355,13 +364,19 @@ kshitiz:
 
 vyom:
 	@echo "🏠  Provisioning Vyom (Compute Layer)..."
-	@echo "INFO: Running Terraform for the Proxmox VMs..."
-	(cd samsara/terraform/vyom && terraform init -upgrade && terraform apply -auto-approve)
-
-	@echo "INFO: Preparing to configure Vyom nodes with Ansible..."
-	@# This follows the same robust cleanup pattern as the kshitiz target
 	@/bin/bash -c ' \
 		set -e; \
+		echo "--------------------------------------------------------------------------------"; \
+		echo "🚀  PHASE 1: Provisioning Virtual Machines with Terraform..."; \
+		echo "--------------------------------------------------------------------------------"; \
+		echo ""; \
+		(cd samsara/terraform/vyom && terraform init -upgrade && terraform apply -auto-approve); \
+		echo ""; \
+		echo "--------------------------------------------------------------------------------"; \
+		echo "🚀  PHASE 2: Configuring Vyom Cluster with Ansible..."; \
+		echo "--------------------------------------------------------------------------------"; \
+		echo ""; \
+		echo "INFO: Preparing to configure Vyom nodes..."; \
 		KEY_FILE="/tmp/prakriti_master_key_$$$$"; \
 		cleanup() { \
 			echo "INFO: Cleaning up temporary SSH key for Vyom..."; \
@@ -409,3 +424,4 @@ pralaya:
 	@echo "INFO: Destroying Kshitiz (Edge Layer)..."
 	#(cd samsara/terraform/kshitiz && terraform destroy -auto-approve)
 	@echo "SUCCESS: Pralaya is complete. The universe has returned to the void."
+..

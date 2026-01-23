@@ -43,7 +43,7 @@
     # Discovery
     static_host_map:
       - internal_ip: "10.42.0.1"
-        public_ip: "18.140.145.253"
+        public_ip: "{{ hostvars['kshitiz-lighthouse']['ansible_host'] }}" # Kshitiz Lighthouse Public IP
         public_port: 4242
 
     # Network Configuration
@@ -80,6 +80,12 @@
       # Simplified check for now based on what we know exists:
       ignore_errors: true
 
+    - name: 🔍 Check Installed Nebula Version
+      command: /usr/bin/nebula --version
+      register: installed_nebula_version
+      ignore_errors: true
+      changed_when: false
+
     - name: 🧹 Cleanup Old Nebula Binaries (Force Upgrade)
       file:
         path: "{{ item }}"
@@ -89,6 +95,7 @@
         - /usr/bin/nebula-cert
         - /usr/local/bin/nebula
         - /usr/local/bin/nebula-cert
+      when: installed_nebula_version.rc != 0 or nebula_version not in installed_nebula_version.stdout
       tags: [cleanup]
 
     - name: 📂 Create Nebula Configuration Directory

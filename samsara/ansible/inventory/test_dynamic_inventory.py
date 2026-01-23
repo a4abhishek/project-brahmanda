@@ -10,7 +10,7 @@ import sys
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(script_dir)
 
-from dynamic_inventory import get_inventory_from_manifest, merge_inventories, find_and_merge_manifests
+from dynamic_inventory import get_inventory_from_manifest, merge_inventories, find_and_merge_manifests, create_parent_groups
 
 class TestDynamicInventory(unittest.TestCase):
 
@@ -25,7 +25,7 @@ class TestDynamicInventory(unittest.TestCase):
     def test_get_inventory_from_valid_manifest(self):
         """Test parsing a single, valid manifest.json file."""
         manifest_content = {
-            "kshitiz": {
+            "kshitiz_lighthouse": {
                 "hosts": [{
                     "name": "kshitiz-lighthouse",
                     "ansible_host": "1.1.1.1",
@@ -45,14 +45,15 @@ class TestDynamicInventory(unittest.TestCase):
                     'kshitiz-lighthouse': {
                         "name": "kshitiz-lighthouse",
                         "ansible_host": "1.1.1.1",
-                        "role": "lighthouse"
+                        "role": "lighthouse",
+                        "inventory_nebula_ip": "10.42.1.1" # Calculated from 1.1.1.1
                     }
                 }
             },
             'all': {
-                'children': ['kshitiz']
+                'children': ['kshitiz_lighthouse']
             },
-            'kshitiz': {
+            'kshitiz_lighthouse': {
                 'hosts': ['kshitiz-lighthouse']
             }
         }
@@ -109,9 +110,9 @@ class TestDynamicInventory(unittest.TestCase):
         os.makedirs(kshitiz_dir)
         os.makedirs(vyom_dir)
 
-        # Kshitiz manifest
+        # Kshitiz manifest (using updated flat structure)
         kshitiz_manifest_content = {
-            "kshitiz": {
+            "kshitiz_lighthouse": {
                 "hosts": [{
                     "name": "kshitiz-lighthouse",
                     "ansible_host": "13.214.253.51"
@@ -121,11 +122,15 @@ class TestDynamicInventory(unittest.TestCase):
         with open(os.path.join(kshitiz_dir, "manifest.json"), 'w') as f:
             json.dump(kshitiz_manifest_content, f)
 
-        # Vyom manifest
+        # Vyom manifest (using updated flat structure)
         vyom_manifest_content = {
-            "vyom": {
+            "vyom_control_plane": {
                 "hosts": [
-                    {"name": "vyom-master-01", "ansible_host": "192.168.68.201"},
+                    {"name": "vyom-master-01", "ansible_host": "192.168.68.201"}
+                ]
+            },
+            "vyom_workers": {
+                "hosts": [
                     {"name": "vyom-worker-01", "ansible_host": "192.168.68.202"}
                 ]
             }
@@ -136,31 +141,69 @@ class TestDynamicInventory(unittest.TestCase):
         # Run the discovery and merge process
         final_inventory = find_and_merge_manifests(terraform_root)
         
-        # Define the expected final, merged output
+        # Define the expected final, merged output (BEFORE parent group processing)
         expected_final_inventory = {
             '_meta': {
                 'hostvars': {
-                    'kshitiz-lighthouse': {"name": "kshitiz-lighthouse", "ansible_host": "13.214.253.51"},
-                    'vyom-master-01': {"name": "vyom-master-01", "ansible_host": "192.168.68.201"},
-                    'vyom-worker-01': {"name": "vyom-worker-01", "ansible_host": "192.168.68.202"}
+                    'kshitiz-lighthouse': {
+                        "name": "kshitiz-lighthouse", 
+                        "ansible_host": "13.214.253.51",
+                        "inventory_nebula_ip": "10.42.1.51"
+                    },
+                    'vyom-master-01': {
+                        "name": "vyom-master-01", 
+                        "ansible_host": "192.168.68.201",
+                        "inventory_nebula_ip": "10.42.1.201"
+                    },
+                    'vyom-worker-01': {
+                        "name": "vyom-worker-01", 
+                        "ansible_host": "192.168.68.202",
+                        "inventory_nebula_ip": "10.42.1.202"
+                    }
                 }
             },
             'all': {
-                'children': sorted(['kshitiz', 'vyom'])
+                'children': sorted(['kshitiz_lighthouse', 'vyom_control_plane', 'vyom_workers'])
             },
-            'kshitiz': {
+            'kshitiz_lighthouse': {
                 'hosts': ['kshitiz-lighthouse']
             },
-            'vyom': {
-                'hosts': sorted(['vyom-master-01', 'vyom-worker-01'])
+            'vyom_control_plane': {
+                'hosts': ['vyom-master-01']
+            },
+            'vyom_workers': {
+                'hosts': ['vyom-worker-01']
             }
         }
         
-        # Sort hosts within groups for consistent comparison
-        if 'vyom' in final_inventory:
-            final_inventory['vyom']['hosts'].sort()
-
         self.assertEqual(final_inventory, expected_final_inventory)
+
+    def test_create_parent_groups(self):
+        """Test the creation of the k3s_cluster parent group."""
+        initial_inventory = {
+            'all': {'children': ['vyom_control_plane', 'vyom_workers', 'other_group']},
+            'vyom_control_plane': {'hosts': ['master']},
+            'vyom_workers': {'hosts': ['worker']},
+            'other_group': {'hosts': ['other']}
+        }
+        
+        processed_inventory = create_parent_groups(initial_inventory)
+        
+        # Verify k3s_cluster exists
+        self.assertIn('k3s_cluster', processed_inventory)
+        
+        # Verify k3s_cluster has the correct children
+        self.assertEqual(
+            sorted(processed_inventory['k3s_cluster']['children']),
+            sorted(['vyom_control_plane', 'vyom_workers'])
+        )
+        
+        # Verify all children now includes k3s_cluster and other_group, 
+        # but NOT the individual vyom groups (they are nested now)
+        self.assertIn('k3s_cluster', processed_inventory['all']['children'])
+        self.assertIn('other_group', processed_inventory['all']['children'])
+        self.assertNotIn('vyom_control_plane', processed_inventory['all']['children'])
+        self.assertNotIn('vyom_workers', processed_inventory['all']['children'])
 
 if __name__ == '__main__':
     unittest.main()
