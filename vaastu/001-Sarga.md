@@ -1,3 +1,5 @@
+<img src="../.github/assets/sarga/sarga-cover.png" alt="Project Brahmanda Sarga Cover">
+
 # Sarga (Creation of Material Elements and Metaphysical Principles)
 
 <p align="center">

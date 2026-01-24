@@ -32,20 +32,20 @@ brahmanda-infra/
 ├── .github/                  # CI Pipelines (GitHub Actions)
 │
 ├── vaastu/                   # 🏛️ Architecture & Blueprints
-│   ├── 00_Brahmanda-Siddhanta.md # The guiding principles and philosophy
-│   ├── 001-Sarga.md              # The primary creation (setup)
-│   ├── 002-Visarga.md            # The secondary creation (architecture)
-│   ├── manthana/                 # 💬 Detailed Rationale (The Churning)
-│   │   ├── README.md             # Explains manthana's purpose
-│   │   └── RFC-XXX...            # Request for Comments (Proposals)
-│   ├── vidhana/                  # 📜 The Rules & Decisions (Constitutional Law)
-│   │   ├── README.md             # Explains vidhana's purpose
-│   │   └── ADR-XXX...            # Architecture Decision Records
-│   ├── anvaya/                   # 📚 Centralized Learning Documents (submodule)
-│   │   ├── USAGE.md              # How to use the Anvaya submodule
-│   │   └── ...                   # All learning docs (read/write, sync)
-│   └── vivechana/                # 🔍 RCAs (Critical Examination)
-│       └── README.md             # Explains vivechana's purpose
+│   ├── 000_Brahmanda-Siddhanta.md # The guiding principles and philosophy
+│   ├── 001-Sarga.md               # The primary creation (setup)
+│   ├── 002-Visarga.md             # The secondary creation (architecture)
+│   ├── manthana/                  # 💬 Detailed Rationale (The Churning)
+│   │   ├── README.md              # Explains manthana's purpose
+│   │   └── RFC-XXX...             # Request for Comments (Proposals)
+│   ├── vidhana/                   # 📜 The Rules & Decisions (Constitutional Law)
+│   │   ├── README.md              # Explains vidhana's purpose
+│   │   └── ADR-XXX...             # Architecture Decision Records
+│   ├── anvaya/                    # 📚 Centralized Learning Documents (submodule)
+│   │   ├── USAGE.md               # How to use the Anvaya submodule
+│   │   └── ...                    # All learning docs (read/write, sync)
+│   └── vivechana/                 # 🔍 RCAs (Critical Examination)
+│       └── README.md              # Explains vivechana's purpose
 │
 ├── samsara/                  # ♾️ Automation (The Cycle)
 │   ├── terraform/            # Provisioning (Infrastructure as Code)

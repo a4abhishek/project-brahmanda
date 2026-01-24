@@ -1,3 +1,5 @@
+<img src="../.github/assets/visarga/visarga-cover.png" alt="Project Brahmanda Sarga Cover">
+
 # Visarga (Formation of Life-Forms)
 
 This document details the **operational architecture** of Project Brahmanda - the workflows for creation, expansion, population, and maintenance.
