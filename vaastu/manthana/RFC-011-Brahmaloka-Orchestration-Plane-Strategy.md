@@ -1,7 +1,10 @@
-# RFC-011: Brahmaloka (Orchestration Plane) Strategy
+# **RFC-011: Brahmaloka (Orchestration Plane) Strategy**
 
-**Status:** Proposed<br>
-**Date:** 2026-01-19
+**Status:** Accepted<br>
+**Date:** 2026-01-19<br>
+**Enhances:** [ADR-001: Hybrid Cloud Architecture](../vidhana/ADR-001-Homelab-Architecture.md)
+
+---
 
 ## 1. Context
 
@@ -15,7 +18,7 @@ The strategy outlined in [RFC-009](./RFC-009-Vyom-Provisioning-Strategy.md) init
 
 - **The Circular Dependency:** If a CI/CD pipeline running *from* Kshitiz needs to update or destroy the `vyom` Nebula nodes, or worse, the Kshitiz node itself, it would be altering the very infrastructure that provides its own connectivity. This could cause the pipeline to fail mid-operation, leaving the infrastructure in a broken, half-deployed state.
 
-An automation pipeline cannot be dependent on the components it is tasked with managing. This violates the principles of reliability and detachment.
+An automation pipeline cannot be dependent on the components it is tasked with managing. This violates the principles of reliability and detachment (*Asanga*).
 
 ## 3. Proposal: The `Brahmaloka` Orchestration Plane
 
@@ -29,17 +32,18 @@ We will introduce a new, fourth conceptual plane to our architecture: **`Brahmal
 This will be the main engine for our CI/CD pipeline.
 
 - **Connectivity:**
-    1. **Direct Proxmox Access:** It will be connected to the local Proxmox management network, giving it direct API access to provision and manage `vyom` VMs.
-    2. **Outbound Polling:** It will function as a standard GitHub Actions self-hosted runner, initiating an outbound HTTPS connection to GitHub to poll for jobs.
-    3. **No Mesh Dependency:** Crucially, for its primary CI/CD function, it will **not** depend on the Kshitiz-Vyom Nebula mesh. This completely resolves the circular dependency issue.
 
-- **Resource Allocation:** This runner is a critical piece of infrastructure, not a minimal-resource VM. It must be adequately provisioned to run `terraform` and `ansible` jobs. A recommended starting point is **2 vCPUs and 2-4 GB of RAM**.
+    1. **Direct Physical Access:** It connects to the **Local Management Network (vmbr0)**. This allows it to talk to the Proxmox API (`192.168.68.200`) and SSH into Vyom nodes (`192.168.68.x`) directly via LAN.
+    2. **Outbound Polling:** It functions as a standard GitHub Actions self-hosted runner, initiating outbound HTTPS connections to GitHub to poll for jobs.
+    3. **No Mesh Dependency:** Crucially, for its primary CI/CD function, it will **not** depend on the Kshitiz-Vyom Nebula mesh. If the mesh is down, the Runner can still SSH in via LAN to fix it. This completely resolves the circular dependency issue.
 
+- **Resource Allocation:** This runner is critical piece of infrastructure. It must be adequately provisioned to run `terraform` and `ansible` jobs. A recommended starting point is **2 vCPUs and 2-4 GB of RAM**.
 - **Lifecycle Management:**
   - The `Brahmaloka-Runner` will be managed by its own dedicated IaC configuration in `samsara/terraform/brahmaloka/`.
   - Its initial creation will be a manual step documented in `001-Sarga.md`, but subsequent updates will be managed via code.
 
 - **CI/CD Flow Diagram:**
+
   ```mermaid
   flowchart TB
    subgraph Samsara["Samsara"]
@@ -75,19 +79,21 @@ To provide secure, out-of-band manual access for debugging and emergencies, we w
     1. It will be connected to the network.
     2. Its power source will be a **Smart Plug**.
 - **Workflow:**
+
     1. **Default State:** The Raspberry Pi is **powered off**, presenting zero attack surface.
-    2. **Activation:** When emergency access is needed, the Smart Plug is remotely activated.
+    2. **Activation:** Operator activates the Smart Plug via an Out-of-Band method (e.g., Vendor App/5G), independent of the Homelab's internal services.
     3. **Function:** Upon booting, the Pi will automatically start the Nebula client and join the mesh, providing an operator with a secure SSH entry point into the on-premise network.
-    4.  **Deactivation:** Once the debugging session is complete, the Smart Plug is turned off, and the bastion goes dark again.
+    4. **Deactivation:** Once the debugging session is complete, operator turns off the Smart Plug, and the bastion goes dark again.
 
 - **"Dark Bastion" Workflow Diagram:**
+
   ```mermaid
   graph TD
       A(Start: Bastion is Powered Off) --> B{"Operator needs emergency access"};
-      B --> C["Operator uses HomeAssistant to turn ON Smart Plug"];
-      C --> D["Raspberry Pi (Bastian) boots up"];
+      B --> C["Operator uses OOB HomeAssistant to turn ON Smart Plug"];
+      C --> D["Raspberry Pi (Bastion) boots up"];
       D --> E["Pi automatically connects to Nebula Mesh"];
-      E --> F["Operator SSHes to internal hosts via Bastian"];
+      E --> F["Operator SSHes to internal hosts via Bastion"];
       F --> G["Operator is Debugging"];
       G --> H{"Debugging complete?"};
       H -- Yes --> I["Operator turns OFF Smart Plug"];
@@ -98,29 +104,41 @@ To provide secure, out-of-band manual access for debugging and emergencies, we w
       style I fill:#f99,stroke:#333,stroke-width:2px;
   ```
 
-### 3.3. Automated Maintenance
+### 3.3. Automated Maintenance (Sthiti)
 
-To ensure the long-term health and security of all components, we will implement an automated maintenance strategy.
+To balance security with stability, we will implement a **Tiered Update Strategy**:
 
-- **Proposal:** A scheduled `cron` job, running on the `Brahmaloka-Runner` itself, will execute a dedicated Ansible playbook (`playbooks/maintenance.yml`).
-- **Function:** This playbook will be responsible for applying OS security updates (`apt upgrade`) to the `Brahmaloka-Runner` itself and all the K3s nodes within the `Vyom` cluster.
+1. **OS Layer (Security):** We will enable `unattended-upgrades` on all nodes, configured to install **security updates only** automatically. This ensures protection against critical vulnerabilities (e.g., kernel, OpenSSL) without manual intervention.
+2. **Application Layer (Stability):** Critical infrastructure components (K3s, Nebula) will have their versions **strictly pinned** in Ansible variables. They will **NOT** be auto-upgraded. Upgrades will be deliberate, initiated by committing a version bump to Git.
+3. **Rolling Reboot Playbook:** The scheduled `vyom-reboot.yml` playbook will **"manage rolling reboots"**. It will:
+    - Check for the `/var/run/reboot-required` flag set by `unattended-upgrades`.
+    - If found, safely **drain** the node to reschedule pods.
+    - Reboot the node.
+    - **Uncordon** the node to return it to service.
 
 - **Automated Maintenance Flow Diagram:**
+
   ```mermaid
   graph TD
-      subgraph "Brahmaloka-Runner VM"
-          A(Cron Scheduler) -- "1. On schedule, executes..." --> B(Ansible Playbook 'maintenance.yml');
+      subgraph "Brahmaloka VM"
+          A(Cron Scheduler) -- "1. On schedule, executes..." --> B(Run maintenance);
       end;
 
-      subgraph "Ansible Playbook Targets"
-          C(Vyom K3s Nodes);
-          D(Brahmaloka-Runner VM itself);
+      subgraph "Vyom Cluster"
+          C(Vyom Nodes);
       end;
 
-      B -- "2. Applies 'apt upgrade' to" --> C;
-      B -- "3. Applies 'apt upgrade' to" --> D;
+      B -- "2. Runs 'apt update' to Brahmaloka itself" --> B;
+      B -- "3. Runs 'apt update' to" --> C;
+      B --> D{"4. reboot-required flag set?"};
+      E(5. Rolling Reboot Vyom Nodes) --> C;
+      D -- Yes --> E;
+      D -- No --> F;
+      C --> F;
+      F(6. Finished Maintainance);
 
       style A fill:#dafdc4,stroke:#333,stroke-width:2px;
+      style F fill:#f99,stroke:#333,stroke-width:2px;
   ```
 
 ## 4. Impact
@@ -135,7 +153,7 @@ To ensure the long-term health and security of all components, we will implement
 
 This RFC proposes a sophisticated, multi-faceted strategy for CI/CD orchestration and remote access. By introducing the `Brahmaloka` plane, we solve the critical circular dependency flaw and establish two distinct patterns for automation and manual intervention:
 
-1. An **always-on, outbound-polling CI/CD runner** for pure automation.
-2. A **normally-off, on-demand bastion host** for secure manual access.
+1. An **always-on, outbound-polling CI/CD runner** for pure automation (operating via physical LAN).
+2. A **normally-off, on-demand bastion host** for secure manual access (operating via OOB Power).
 
 This design significantly enhances the security, resilience, and professional quality of the Project Brahmanda architecture.
