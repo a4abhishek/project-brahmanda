@@ -17,11 +17,12 @@
 
 ### **🏛️ The Architecture**
 
-The universe is divided into three planes of existence:
+The universe is divided into four planes of existence:
 
 1. **Kshitiz (The Edge):** The event horizon. An AWS Lightsail instance in Singapore acting as the secure gateway and Nebula Lighthouse.
 2. **Vyom (The Cluster):** The compute core. An ASUS NUC 14 Pro Plus (96GB RAM) running Proxmox and Kubernetes (K3s), where the applications live.
-3. **Samsara (The Cycle):** The automation layer. Terraform and Ansible pipelines that govern the creation, configuration, and destruction of the universe.
+3. **Brahmaloka (The Orchestrator):** The orchestration plane. A dedicated, privileged VM sitting outside the compute cluster, housing CI/CD runners and emergency access points.
+4. **Samsara (The Cycle):** The automation layer. Terraform and Ansible pipelines that govern the creation, configuration, and destruction of the universe.
 
 ## **📂 The Directory Structure**
 
@@ -32,9 +33,10 @@ brahmanda-infra/
 ├── .github/                  # CI Pipelines (GitHub Actions)
 │
 ├── vaastu/                   # 🏛️ Architecture & Blueprints
-│   ├── 000_Brahmanda-Siddhanta.md # The guiding principles and philosophy
+│   ├── 000-Brahmanda-Siddhanta.md # The guiding principles and philosophy
 │   ├── 001-Sarga.md               # The primary creation (setup)
-│   ├── 002-Visarga.md             # The secondary creation (architecture)
+│   ├── 002-Samsara.md             # The lifecycle management (CI/CD)
+│   ├── 003-Visarga.md             # The secondary creation (Software Deployment)
 │   ├── manthana/                  # 💬 Detailed Rationale (The Churning)
 │   │   ├── README.md              # Explains manthana's purpose
 │   │   └── RFC-XXX...             # Request for Comments (Proposals)
@@ -50,7 +52,8 @@ brahmanda-infra/
 ├── samsara/                  # ♾️ Automation (The Cycle)
 │   ├── terraform/            # Provisioning (Infrastructure as Code)
 │   │   ├── kshitiz/          # Edge Layer (AWS Lightsail)
-│   │   └── vyom/             # Compute Layer (Proxmox VMs)
+│   │   ├── vyom/             # Compute Layer (Proxmox VMs)
+│   │   └── brahmaloka/       # Orchestration Plane (Runner VM)
 │   │
 │   └── ansible/              # Configuration Management
 │       ├── inventory/        # Hosts and IPs
@@ -73,30 +76,44 @@ brahmanda-infra/
 
 ## **💥 Mahasphota (Getting Started)**
 
+The manifestation of the Brahmanda is a progressive ritual. Follow these manuals in the prescribed order to bring your universe into existence:
+
+1. 📖 **[Sarga (Primary Creation)](vaastu/001-Sarga.md)**: The manual for physical setup, from hardware procurement to Proxmox installation and initial bootstrapping.
+2. ♾️ **[Samsara (The Cycle)](vaastu/002-Samsara.md)**: The manual for automation, establishing the self-hosted CI/CD pipeline and the Brahmaloka Orchestrator.
+3. 🌿 **[Visarga (Secondary Creation)](vaastu/003-Visarga.md)**: The manual for population, detailing how to deploy microservices and maintain the living cluster via GitOps.
+
 ### **Prerequisites**
 
 * **Hardware:** ASUS NUC 14 Pro Plus (Project Vyom).
-* **Software:** 1Password CLI (op), Terraform, Ansible, Make.
+* **Software:** 1Password CLI (`op`), Terraform, Ansible, Make.
 * **Access:** You must have the **Vault Password** stored in your 1Password keychain to decrypt the infrastructure secrets.
 
 ### **Quick Start (The Divine Commands)**
 
-We use a **Makefile** to invoke the creation and destruction of the Brahmanda. Ensure you are authenticated with 1Password (op signin) before running these commands.
+We use a **Makefile** to invoke the creation and destruction of the Brahmanda. Ensure you are authenticated with 1Password (`op signin`) before running these commands.
 
-1. Invoke Creation (Srishti):
-   Provision Kshitiz and Vyom, and bootstrap the cluster.
-   make srishti
-2. Targeted Manifestation:
-   If you only need to update or provision a specific plane.
-   make kshitiz   \# Spawns/Updates only the Edge (Lightsail)
-   make vyom      \# Spawns/Updates only the Cluster (NUC)
-3. Restore State (Sankalpa):
-   Once the universe is created, apply your will (GitOps).
-   * Log into ArgoCD.
-   * Sync the sankalpa/ directory.
-4. Invoke Dissolution (Pralaya):
-   Destroy all resources to return to the void.
-   make pralaya
+1. **Invoke Creation (Srishti):**
+    Provision Kshitiz and Vyom, and bootstrap the cluster.
+
+    ```bash
+    make srishti
+    ```
+
+2. **Targeted Manifestation:**
+    If you only need to update or provision a specific plane.
+
+    ```bash
+    make kshitiz   # Spawns/Updates only the Edge (Lightsail)
+    make vyom      # Spawns/Updates only the Cluster (NUC)
+    make brahmaloka # Spawns/Updates only the Orchestrator
+    ```
+
+3. **Invoke Dissolution (Pralaya):**
+    Destroy all resources to return to the void.
+
+    ```bash
+    make pralaya
+    ```
 
 ## **📜 Vidhana (The Rules)**
 

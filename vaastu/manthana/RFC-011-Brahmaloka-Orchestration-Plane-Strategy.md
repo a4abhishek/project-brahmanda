@@ -141,13 +141,21 @@ To balance security with stability, we will implement a **Tiered Update Strategy
       style F fill:#f99,stroke:#333,stroke-width:2px;
   ```
 
+### 3.4. Identity Separation Strategy
+
+To maintain a "Zero Trust" posture between the Orchestrator and the Orchestrated:
+
+- **The Risk:** If Brahmaloka uses the same SSH key for its *own* access as it uses to manage Vyom (`Prakriti-Master-Key`), a compromise of that key (used widely for cluster management) would allow Lateral Movement into the Brahmaloka. From there, an attacker could access the 1Password Service Account Token and **compromise the entire vault**.
+- **The Decision:** Brahmaloka MUST use a **distinct** SSH Key pair (`Brahmaloka-Key`) for incoming connections.
+- **Implementation:** The Terraform module for Brahmaloka will accept a specific `ssh_public_key_path` variable to inject this unique identity, overriding the default template key.
+
 ## 4. Impact
 
 - **New Architectural Plane:** Introduces `Brahmaloka` as the orchestration layer. The `README.md` and high-level diagrams will need to be updated to reflect this fourth plane.
 - **New Terraform Module:** A new directory, `samsara/terraform/brahmaloka/`, will be created to manage the runner's infrastructure.
 - **New Ansible Configuration:** A corresponding `samsara/ansible/group_vars/brahmaloka/` and `playbooks/` for the runner will be created.
 - **Updates to `001-Sarga.md`:** A new manual step will be added to describe the initial setup of the `Brahmaloka-Runner` VM and the Bastion Pi.
-- **Updates to `002-Visarga.md`:** New operational procedures for using the Bastion-on-Demand and managing the automated maintenance will be added.
+- **Updates to `003-Visarga.md`:** New operational procedures for using the Bastion-on-Demand and managing the automated maintenance will be added.
 
 ## 5. Conclusion
 

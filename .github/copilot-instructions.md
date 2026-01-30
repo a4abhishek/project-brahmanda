@@ -102,11 +102,12 @@ Project Brahmanda adheres to the **"Asanga Shastra"** (Weapon of Detachment) - t
 
 ## Project Architecture
 
-### The Three Planes of Existence
+### The Four Planes of Existence
 
 1. **Kshitiz (The Edge):** AWS Lightsail gateway and Nebula Lighthouse for external access
 2. **Vyom (The Cluster):** On-premises compute (ASUS NUC) running Proxmox and K3s
-3. **Samsara (The Cycle):** Terraform and Ansible automation for creation and destruction
+3. **Brahmaloka (The Orchestrator):** Dedicated orchestration plane housing the CI/CD runners and emergency access bastions, sitting outside the failure domain of the compute cluster
+4. **Samsara (The Cycle):** Terraform and Ansible automation for creation and destruction
 
 **Critical Design Decision:** Nebula mesh is used **only for North-South traffic** (external → cluster ingress). Kubernetes internal communication (East-West) occurs over local LAN (VLAN 30) to avoid encryption overhead.
 
@@ -121,7 +122,12 @@ Project Brahmanda adheres to the **"Asanga Shastra"** (Weapon of Detachment) - t
 - Purpose: Step-by-step guide for laypersons that includes everything from hardware procurement to initial bootstrapping until the project is in a state where Infrastructure as Code can take charge
 - Phases: Samidha (Prerequisites) → Upadana (Hardware) → Purvanga (Reconnaissance) → Pramana (Credentials) → Adhisthana (Secrets) → Sarga (OS) → Samsara (Automation) → Srishti (Manifestation)
 
-**002-Visarga.md** - Day 1+ Operations Manual
+**002-Samsara.md** - Automation Manual
+- Philosophy: Samsara represents the eternal cycle of birth and rebirth managed by code.
+- Purpose: Guide to setting up the CI/CD pipeline, the Brahmaloka orchestrator, and the distributed locking mechanism.
+- Components: Brahmaloka Runner, Upstash Lease, Atomic Deployment Units.
+
+**003-Visarga.md** - Day 1+ Operations Manual
 - Philosophy: Visarga means creating matter, establishing metaphysical rules, and populating the Brahmanda. Analogous to "everything after Mahasphota (The Big Bang)", up to the population of its residence (microservices)
 - Purpose: Operational workflows for expansion, deployment, and maintenance
 - Focus: Vistara (Expansion), Sankalpa (Deployment), ongoing operations
@@ -365,6 +371,18 @@ brahmanda-infra/
 - Handle partial failures gracefully (resume capability)
 - Use tools' native idempotency features (apt, brew, Terraform, Ansible)
 
+### Samsara Pipeline Standards
+
+**The Atomic Unit:**
+- Infrastructure Provisioning (Terraform) and Configuration (Ansible) are a single atomic unit.
+- They must run sequentially within the same lock context.
+- **Never** run them in isolation for production changes.
+
+**The Upstash Lease (Distributed Locking):**
+- All production changes must acquire a distributed lock from Upstash Redis.
+- The `Makefile` handles this automatically (`SET NX PX`).
+- **Manual Terraform runs are FORBIDDEN** in production as they bypass the lock and the atomic workflow.
+
 ### Terraform
 - Prefix resources with `kshitiz-` or `vyom-`
 - Use explicit resource naming
@@ -398,8 +416,9 @@ brahmanda-infra/
 1. **`.github/copilot-instructions.md` (This File):** New guidelines, constraints, or patterns
 2. **`README.md`:** Project structure, philosophy, or quick-start changes
 3. **`vaastu/001-Sarga.md`:** Day 0 setup process changes (new prerequisites, different tools)
-4. **`vaastu/002-Visarga.md`:** Operational workflow changes (deployment patterns, expansion)
-5. **Related RFCs/ADRs:** Ensure decisions remain consistent
+4. **`vaastu/002-Samsara.md`:** Automation process changes (new CI/CD patterns, runner setup)
+5. **`vaastu/003-Visarga.md`:** Operational workflow changes (deployment patterns, expansion)
+6. **Related RFCs/ADRs:** Ensure decisions remain consistent
 
 ## Common Anti-Patterns (Avoid These)
 
@@ -465,7 +484,8 @@ These instructions aim to:
 
 **Key Files:**
 - `vaastu/001-Sarga.md` - Complete Day 0 setup guide (hardware to bootstrap)
-- `vaastu/002-Visarga.md` - Day 1+ operations (expansion, deployment)
+- `vaastu/002-Samsara.md` - Automation manual (CI/CD setup and usage)
+- `vaastu/003-Visarga.md` - Day 1+ operations (expansion, deployment)
 - `Makefile` - Common development tasks
 - `README.md` - Project overview and quick start
 

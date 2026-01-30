@@ -280,7 +280,7 @@ After successful Kshitiz deployment and Ansible configuration:
 2. Deploy the K3s Kubernetes cluster.
 3. Configure Ingress to route traffic from Kshitiz to services in Vyom.
 
-See `vaastu/002-Visarga.md` for operational procedures.
+See `vaastu/003-Visarga.md` for operational procedures.
 
 ## Cleanup (Pralaya)
 

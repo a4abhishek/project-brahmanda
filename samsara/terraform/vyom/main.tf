@@ -2,17 +2,17 @@
 provider "onepassword" {
 }
 
+data "onepassword_item" "proxmox_credentials" {
+  vault = "Project-Brahmanda"
+  title = "Proxmox-samsara-iac"
+}
+
 # Proxmox Provider Configuration
 provider "proxmox" {
   endpoint = var.proxmox_endpoint
   username  = data.onepassword_item.proxmox_credentials.username
   password  = data.onepassword_item.proxmox_credentials.password
   insecure  = true
-}
-
-data "onepassword_item" "proxmox_credentials" {
-  vault = "Project-Brahmanda"
-  title = "Proxmox-samsara-iac"
 }
 
 # --- Vyom Cluster Resources ---

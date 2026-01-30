@@ -44,6 +44,34 @@ This VM serves as the persistent engine for the Samsara cycle.
   * **Traffic:** Outbound-only connection to GitHub (HTTPS long-polling). No inbound ports required.
   * **Secrets:** Service Account credentials (`OP_SERVICE_ACCOUNT_TOKEN`) are injected via GitHub Secrets.
 
+- **CI/CD Flow Diagram:**
+
+  ```mermaid
+  flowchart TB
+   subgraph Samsara["Samsara"]
+          GitHub("GitHub Actions")
+          Developer(["Developer"])
+    end
+   subgraph subGraph1["Guest VMs"]
+          BRunner("Brahmaloka-Runner VM")
+          Vyom("Vyom Cluster VMs")
+    end
+   subgraph subGraph2["Brahmanda (On-Premise): Proxmox Hypervisor (NUC)"]
+      direction LR
+          subGraph1
+          PVE_API("Proxmox API Service")
+    end
+      Developer -- "1. git push" --> GitHub
+      GitHub -- "2. Job is Queued" --> JobsDB[("Workflow Jobs")]
+      BRunner -- "3. Polls for jobs" --> GitHub
+      BRunner -- "4. Runs terraform via API" --> PVE_API
+      PVE_API -- "5. Creates/Configures" --> Vyom
+      BRunner -- "6. Configures OS (Ansible)" --> Vyom
+
+      style BRunner fill:#f9f,stroke:#333,stroke-width:2px
+      style Vyom fill:#ccf,stroke:#333,stroke-width:2px
+  ```
+
 ### B. The Dark Bastion (Emergency Access)
 
 To provide secure human access without a persistent footprint, we implement the **"Dark Bastion"** pattern.
@@ -61,6 +89,25 @@ To provide secure human access without a persistent footprint, we implement the 
   3. **Boot:** The Pi boots, connects to the internet, and establishes the Nebula tunnel.
   4. **Access:** Operator SSHes into the Pi's Nebula IP. From there, they can jump to any local node.
   5. **Termination:** Operator turns the smart plug **OFF**. The bastion goes dark.
+
+- **"Dark Bastion" Workflow Diagram:**
+
+  ```mermaid
+  graph TD
+      A(Start: Bastion is Powered Off) --> B{"Operator needs emergency access"};
+      B --> C["Operator uses OOB HomeAssistant to turn ON Smart Plug"];
+      C --> D["Raspberry Pi (Bastion) boots up"];
+      D --> E["Pi automatically connects to Nebula Mesh"];
+      E --> F["Operator SSHes to internal hosts via Bastion"];
+      F --> G["Operator is Debugging"];
+      G --> H{"Debugging complete?"};
+      H -- Yes --> I["Operator turns OFF Smart Plug"];
+      I --> J[End: Bastion is Powered Off];
+      H -- No --> G;
+
+      style A fill:#f99,stroke:#333,stroke-width:2px;
+      style I fill:#f99,stroke:#333,stroke-width:2px;
+  ```
 
 ### C. Automated Maintenance (Sthiti)
 
@@ -82,6 +129,39 @@ To ensure Vyom and Brahmaloka remain secure without sacrificing stability, we im
         2. **Reboot**.
         3. **Uncordon** the node (return to service).
   * **Constraint:** The Proxmox Host itself is excluded from automatic reboots.
+
+- **Automated Maintenance Flow Diagram:**
+
+  ```mermaid
+  graph TD
+      subgraph "Brahmaloka VM"
+          A(Cron Scheduler) -- "1. On schedule, executes..." --> B(Run maintenance);
+      end;
+
+      subgraph "Vyom Cluster"
+          C(Vyom Nodes);
+      end;
+
+      B -- "2. Runs 'apt update' to Brahmaloka itself" --> B;
+      B -- "3. Runs 'apt update' to" --> C;
+      B --> D{"4. reboot-required flag set?"};
+      E(5. Rolling Reboot Vyom Nodes) --> C;
+      D -- Yes --> E;
+      D -- No --> F;
+      C --> F;
+      F(6. Finished Maintainance);
+
+      style A fill:#dafdc4,stroke:#333,stroke-width:2px;
+      style F fill:#f99,stroke:#333,stroke-width:2px;
+  ```
+
+### D. Identity Separation (Security)
+
+To prevent Lateral Privilege Escalation, we enforce strict identity separation:
+
+* **Incoming Access (to Brahmaloka):** MUST use a dedicated **`Brahmaloka-Key`**.
+* **Outgoing Access (from Brahmaloka to Vyom):** Uses the **`Prakriti-Master-Key`** (injected ephemerally at runtime).
+* **Rationale:** If Brahmaloka accepted the `Prakriti-Master-Key` for login, a compromise of that key (used widely for cluster management) would allow Lateral Movement into the Brahmaloka Node. From there, an attacker could access the 1Password Service Account Token and compromise the entire vault. Therefore, access to the Brahmaloka must be guarded by a strictly separate credential.
 
 ## 4. Lifecycle Management
 

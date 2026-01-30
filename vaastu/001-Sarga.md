@@ -285,7 +285,7 @@ From `ipconfig /all` output, record these values:
 
 > **IP Selection:** Always pick an IP in the higher range (e.g., .200–.250). Standard routers assign DHCP leases starting from the bottom (.2, .3, etc.). Staying high prevents future IP conflicts.
 
-> **⚠️ Day 0 Temporary Configuration:** We use your existing router's network settings for initial Proxmox installation. Once Proxmox is running, we'll configure **proper network segmentation** with VLANs (documented in `002-Visarga.md`):
+> **⚠️ Day 0 Temporary Configuration:** We use your existing router's network settings for initial Proxmox installation. Once Proxmox is running, we'll configure **proper network segmentation** with VLANs (documented in `003-Visarga.md`):
 >
 > - **VLAN 20:** `192.168.20.0/24` - Management (Proxmox host, 254 usable IPs)
 > - **VLAN 30:** `192.168.30.0/24` - DMZ (K3s nodes, 254 usable IPs)
@@ -1761,7 +1761,7 @@ To recreate Proxmox installation (hardware replacement, testing, etc.):
 
 **This is the essence of "Asanga Shastra" - detachment through automation.**
 
-> **Note:** This uses your existing network configuration discovered in Phase 3. After Proxmox is running, we'll reconfigure with VLANs (see `002-Visarga.md` for VLAN 20 Management and VLAN 30 DMZ setup).
+> **Note:** This uses your existing network configuration discovered in Phase 3. After Proxmox is running, we'll reconfigure with VLANs (see `003-Visarga.md` for VLAN 20 Management and VLAN 30 DMZ setup).
 
 ### **What's Next After Proxmox Installation**
 

@@ -66,7 +66,7 @@ For live VMs that are already running, we need a way to apply security patches w
 -   **New IaC Directory:** `samsara/packer/vyom/` will be created.
 -   **New Ansible Playbooks:** Requires `bake-image.yml` for Packer and `maintenance-upgrade.yml` for the cron job.
 -   **Update to `001-Sarga.md`:** The manual instructions for creating a template will be replaced with instructions on how to install Packer and run the `packer build` command.
--   **Update to `002-Visarga.md`:** A new operational procedure for scheduling and managing the maintenance playbook will be added.
+-   **Update to `003-Visarga.md`:** A new operational procedure for scheduling and managing the maintenance playbook will be added.
 -   **Update to `RFC-009`:** A reference to this RFC will be added to clarify how the template prerequisite is fulfilled.
 
 ## 5. Conclusion
