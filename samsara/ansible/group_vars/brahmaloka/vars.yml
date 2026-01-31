@@ -1,0 +1,12 @@
+# GitHub Runner Configuration
+brahmaloka_runner_user: "runner"
+brahmaloka_runner_group: "runner"
+brahmaloka_runner_version: "2.331.0"
+brahmaloka_github_account: "a4abhishek"
+brahmaloka_github_repo: "project-brahmanda-private"
+
+# Path where we clone the repo for the runner to use
+brahmaloka_repo_path: "/home/{{ brahmaloka_runner_user }}/project-brahmanda"
+
+brahmaloka_runner_name: "{{ inventory_hostname }}"
+brahmaloka_runner_dir: "/opt/actions-runner"

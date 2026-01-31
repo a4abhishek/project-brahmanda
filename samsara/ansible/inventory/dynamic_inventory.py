@@ -52,9 +52,9 @@ def get_inventory_from_manifest(manifest_path):
             if host_name:
                 inventory[group_name]["hosts"].append(host_name)
 
-                # Derive nebula_ip from ansible_host
+                # Derive nebula_ip from ansible_host only for vyom nodes
                 ansible_host_ip = host_data.get("ansible_host")
-                if ansible_host_ip:
+                if ansible_host_ip and group_name.startswith("vyom"):
                     last_octet = ansible_host_ip.split('.')[-1]
                     host_data["inventory_nebula_ip"] = f"10.42.1.{last_octet}" # Assuming 10.42.1.x for vyom nodes
 

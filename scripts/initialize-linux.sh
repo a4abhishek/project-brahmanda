@@ -216,6 +216,7 @@ configure_pipx_path() {
   info "Configuring pipx PATH..."
   
   pipx ensurepath
+  export PATH="$HOME/.local/bin:$PATH"
   
   if grep -Fxq "export PATH=\"\$HOME/.local/bin:\$PATH\"" ~/.bashrc; then
     info "PATH already configured in ~/.bashrc"

@@ -12,6 +12,14 @@
     - import_tasks: ../handlers/main.yml
 
   tasks:
+    - name: 🛡️ Validate Root Disk Size (Pre-Flight)
+      assert:
+        that:
+          - item.size_total > 10 * 1024 * 1024 * 1024
+        msg: "ERROR: Root partition is too small ({{ (item.size_total / 1024 / 1024 / 1024) | round(2) }} GB). Partition resize failed!"
+      loop: "{{ ansible_mounts }}"
+      when: item.mount == "/"
+
     - name: 🛡️ Harden SSH Server
       import_tasks: ./tasks/harden_ssh.yml
 

@@ -423,6 +423,56 @@ vyom:
 	'
 	@echo "🕉️  SUCCESS: Vyom has been manifested."
 
+brahmaloka:
+	@echo "🏗️  Provisioning Brahmaloka (Orchestration Layer)..."
+	@/bin/bash -c ' \
+		set -e; \
+		echo "--------------------------------------------------------------------------------"; \
+		echo "🚀  PHASE 1: Provisioning Brahmaloka with Terraform..."; \
+		echo "--------------------------------------------------------------------------------"; \
+		echo ""; \
+		echo "INFO: Fetching R2 Backend Credentials..."; \
+		R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
+		R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
+		R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
+		if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
+			echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
+			exit 1; \
+		fi; \
+		echo "INFO: Fetching Brahmaloka Identity..."; \
+		SSH_PUB_KEY_FILE="/tmp/brahmaloka_pub_key_$$$$"; \
+		op read "op://Admin-Project-Brahmanda/Brahmaloka-SSH-Key/public key" > "$$SSH_PUB_KEY_FILE"; \
+		echo "INFO: Running Terraform for the Runner VM..."; \
+		(cd samsara/terraform/brahmaloka && terraform init -upgrade \
+			-backend-config="access_key=$$R2_ACCESS_KEY" \
+			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
+			-backend-config="endpoint=$$R2_ENDPOINT" \
+			&& terraform apply -auto-approve -var="ssh_public_key_path=$$SSH_PUB_KEY_FILE"); \
+		rm -f "$$SSH_PUB_KEY_FILE"; \
+		echo ""; \
+		echo "--------------------------------------------------------------------------------"; \
+		echo "🚀  PHASE 2: Configuring Brahmaloka with Ansible..."; \
+		echo "--------------------------------------------------------------------------------"; \
+		echo ""; \
+		echo "INFO: Preparing to configure Brahmaloka..."; \
+		KEY_FILE="/tmp/brahmaloka_priv_key_$$$$"; \
+		cleanup() { \
+			echo "INFO: Cleaning up temporary SSH keys..."; \
+			rm -f "$$KEY_FILE"; \
+		}; \
+		trap cleanup EXIT; \
+		echo "INFO: Materializing Brahmaloka Private Key..."; \
+		op read "op://Admin-Project-Brahmanda/Brahmaloka-SSH-Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
+		chmod 600 "$$KEY_FILE"; \
+		echo "INFO: Running Ansible to configure the Runner..."; \
+		(cd samsara/ansible && \
+			$(ANSIBLE_ENV) ansible-playbook playbooks/03-bootstrap-brahmaloka.yml \
+			--private-key="$$KEY_FILE" \
+			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
+		); \
+	'
+	@echo "🕉️  SUCCESS: Brahmaloka has been manifested."
+
 kubeconfig:
 	@echo "☸️  Fetching Kubeconfig from Vyom Control Plane..."
 	@/bin/bash -c ' \

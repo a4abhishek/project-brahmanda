@@ -72,6 +72,14 @@
   # Phase 0: Validation & Preparation
   # ---------------------------------------------------------------------------
   pre_tasks:
+    - name: 🛡️ Validate Root Disk Size (Pre-Flight)
+      assert:
+        that:
+          - item.size_total > 10 * 1024 * 1024 * 1024
+        msg: "ERROR: Root partition is too small ({{ (item.size_total / 1024 / 1024 / 1024) | round(2) }} GB). Partition resize failed!"
+      loop: "{{ ansible_mounts }}"
+      when: item.mount == "/"
+
     - name: 🛡️ Verify Identity Existence
       fail:
         msg: "Identity missing for {{ inventory_hostname }}. Ensure 'vault_nebula_cert' and 'vault_nebula_key' are defined in host_vars."

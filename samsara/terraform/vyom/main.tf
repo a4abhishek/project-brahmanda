@@ -46,7 +46,7 @@ resource "proxmox_virtual_environment_vm" "control_plane" {
   }
 
   disk {
-    interface    = "virtio0"
+    interface    = "scsi0"
     datastore_id = "local-lvm"
     size         = local.nodes.control_plane.disk
     iothread     = true
@@ -95,7 +95,7 @@ resource "proxmox_virtual_environment_vm" "worker" {
   disk {
     datastore_id = "local-lvm"
     size         = local.nodes.worker.disk
-    interface    = "virtio0"
+    interface    = "scsi0"
     iothread     = true
     discard      = "on"
   }

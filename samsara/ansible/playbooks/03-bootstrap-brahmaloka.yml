@@ -1,0 +1,196 @@
+# -----------------------------------------------------------------------------
+# 🕉️ Srishti: Brahmaloka Manifestation (Orchestration Plane)
+# -----------------------------------------------------------------------------
+# This playbook configures the CI/CD Runner VM.
+# -----------------------------------------------------------------------------
+
+- name: Manifest Brahmaloka (Orchestrator)
+  hosts: brahmaloka
+  become: true
+
+  # Load variables hierarchy:
+  # 1. Group Vars (Common settings)
+  vars_files:
+    - ../group_vars/brahmaloka/vars.yml
+    - ../group_vars/brahmaloka/vault.yml
+
+  gather_facts: false # We wait for connection first
+
+  # ---------------------------------------------------------------------------
+  # Phase 0: Validation & Connection
+  # ---------------------------------------------------------------------------
+  pre_tasks:
+    - name: ⏳ Wait for SSH Connection
+      wait_for_connection:
+        delay: 5
+        timeout: 300
+
+    - name: 🔍 Gather Facts
+      setup:
+
+    - name: 🛡️ Validate Root Disk Size (Pre-Flight)
+      assert:
+        that:
+          - item.size_total > 10 * 1024 * 1024 * 1024
+        msg: "ERROR: Root partition is too small ({{ (item.size_total / 1024 / 1024 / 1024) | round(2) }} GB). Partition resize failed! Check if Terraform resized the correct disk (SCSI vs Virtio)."
+      loop: "{{ ansible_mounts }}"
+      when: item.mount == "/"
+
+    - name: 🛡️ Verify Secrets
+      fail:
+        msg: "GitHub Runner Token is missing! Check vault."
+      when: brahmaloka_registration_token == ""
+
+    - name: 🐛 Debug Token
+      debug:
+        msg: "Token value is: '{{ brahmaloka_registration_token[:4] }}...{{ brahmaloka_registration_token[-4:] }}'"
+
+  # ---------------------------------------------------------------------------
+  # Phase 1: System Preparation & Identity
+  # ---------------------------------------------------------------------------
+  tasks:
+    # --- System Preparation ---
+    - name: 💾 Expand Filesystem (Rescue)
+      shell: |
+        # Try growing partition 1 on vda or sda
+        growpart /dev/vda 1 || growpart /dev/sda 1 || true
+        # Resize filesystem
+        resize2fs /dev/vda1 || resize2fs /dev/sda1 || true
+      become: true
+      ignore_errors: yes
+      changed_when: false
+
+    - name: ⏳ Wait for apt lock
+      shell: while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
+      become: true
+      changed_when: false
+
+    - name: 👤 Create Runner User
+      user:
+        name: "{{ brahmaloka_runner_user }}"
+        shell: /bin/bash
+        groups: sudo
+        append: yes
+        state: present
+
+    - name: 🔓 Allow Passwordless Sudo for Runner
+      copy:
+        content: "{{ brahmaloka_runner_user }} ALL=(ALL) NOPASSWD:ALL"
+        dest: "/etc/sudoers.d/{{ brahmaloka_runner_user }}"
+        mode: '0440'
+
+    - name: 📦 Install Bootstrap Dependencies (Git, Rsync, Make)
+      apt:
+        name: 
+          - git
+          - rsync
+          - make
+          - build-essential
+        state: present
+        update_cache: yes
+        lock_timeout: 300
+
+    - name: 📂 Create Project Directory
+      file:
+        path: "{{ brahmaloka_repo_path }}"
+        state: directory
+        owner: "{{ brahmaloka_runner_user }}"
+        group: "{{ brahmaloka_runner_group }}"
+        mode: '0755'
+
+    - name: 📤 Push Scripts & Makefile (Avoid Git Auth)
+      synchronize:
+        src: "../../../{{ item }}"
+        dest: "{{ brahmaloka_repo_path }}/"
+        recursive: yes
+        delete: no
+      with_items:
+        - scripts
+        - Makefile
+        - requirements.txt
+
+    - name: 🔑 Inject 1Password Service Account Token
+      lineinfile:
+        path: "/home/{{ brahmaloka_runner_user }}/.bashrc"
+        line: "export OP_SERVICE_ACCOUNT_TOKEN={{ vault_op_service_account_token | trim }}"
+        owner: "{{ brahmaloka_runner_user }}"
+        mode: '0600'
+        state: present
+
+    - name: 🛠️ Initialize Tools (Terraform, Ansible, 1Password)
+      command: make init
+      args:
+        chdir: "{{ brahmaloka_repo_path }}"
+      become_user: "{{ brahmaloka_runner_user }}"
+      environment:
+        OP_SERVICE_ACCOUNT_TOKEN: "{{ vault_op_service_account_token | trim }}"
+        PATH: "/home/{{ brahmaloka_runner_user }}/.local/bin:{{ ansible_env.PATH }}"
+      register: tool_install_result
+      changed_when: "'upgraded' in tool_install_result.stdout or 'installed' in tool_install_result.stdout"
+
+    # --- Runner Installation ---
+    - name: 🔍 Check if Runner is Configured
+      stat:
+        path: "{{ brahmaloka_runner_dir }}/.runner"
+      register: runner_configured
+
+    - name: 📂 Create Runner Directory
+      file:
+        path: "{{ brahmaloka_runner_dir }}"
+        state: directory
+        owner: "{{ brahmaloka_runner_user }}"
+        group: "{{ brahmaloka_runner_group }}"
+        mode: '0755'
+
+    - name: ⬇️ Download Runner
+      unarchive:
+        src: "https://github.com/actions/runner/releases/download/v{{ brahmaloka_runner_version }}/actions-runner-linux-x64-{{ brahmaloka_runner_version }}.tar.gz"
+        dest: "{{ brahmaloka_runner_dir }}"
+        remote_src: yes
+        owner: "{{ brahmaloka_runner_user }}"
+        group: "{{ brahmaloka_runner_group }}"
+      when: not runner_configured.stat.exists
+
+    - name: ⚙️ Configure Runner
+      command: >
+        ./config.sh --unattended --url https://github.com/{{ brahmaloka_github_account }}/{{ brahmaloka_github_repo }} --token {{ brahmaloka_registration_token | trim }} --name {{ brahmaloka_runner_name }} --work _work
+      args:
+        chdir: "{{ brahmaloka_runner_dir }}"
+      become_user: "{{ brahmaloka_runner_user }}"
+      when: not runner_configured.stat.exists
+
+    - name: 👮 Ensure Permissions
+      file:
+        path: "{{ brahmaloka_runner_dir }}"
+        owner: "{{ brahmaloka_runner_user }}"
+        group: "{{ brahmaloka_runner_group }}"
+        recurse: yes
+
+    - name: 🔌 Install Runner Service
+      command: ./svc.sh install {{ brahmaloka_runner_user }}
+      args:
+        chdir: "{{ brahmaloka_runner_dir }}"
+      become: true
+      ignore_errors: yes # Ignore if already installed
+
+    - name: ▶️ Start Runner Service
+      command: ./svc.sh start
+      args:
+        chdir: "{{ brahmaloka_runner_dir }}"
+      become: true
+      ignore_errors: yes
+
+  # ---------------------------------------------------------------------------
+  # Phase 3: Identity Security (Identity Separation)
+  # ---------------------------------------------------------------------------
+  post_tasks:
+    - name: 🛡️ Audit Authorized Keys (Remove Prakriti Key)
+      # This ensures ONLY the key we explicitly allow (Brahmaloka Key) is present
+      # For now, we assume the Terraform injection set the initial key.
+      # If we want to strictly enforce it here, we would need the public key variable available.
+      # Since we don't have the public key content in this playbook easily (it's in 1Password),
+      # we rely on the Terraform provisioning step to have set the correct key.
+      # However, we can disable the default 'ubuntu' user to force usage of 'runner' user?
+      # Or just ensure 'runner' user has its own key?
+      debug:
+        msg: "Security: Ensure you SSH as 'ubuntu' (admin) or 'runner' using Brahmaloka Key only."

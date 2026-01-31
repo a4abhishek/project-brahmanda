@@ -117,6 +117,7 @@ To adhere to the principle of least privilege, Terraform does not use the `root`
     - `VM.Migrate`
     - `VM.PowerMgmt`
     - `Pool.Allocate`
+    - `SDN.Use`
     - `Sys.Audit`
     - `Sys.Console`
     - `Sys.Modify`

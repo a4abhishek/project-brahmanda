@@ -1,0 +1,17 @@
+---
+# Brahmaloka Ansible Vault Template
+# Generated from: make nidhi-tirodhana VAULT=brahmaloka
+# DO NOT EDIT vault.yml DIRECTLY - Edit this template and regenerate
+#
+# This template uses 1Password secret references (op://)
+# Run `make nidhi-tirodhana VAULT=brahmaloka` to generate the encrypted vault.yml
+
+# GitHub Runner Registration Token
+# Note: This token expires in 1 hour. You must update it in 1Password
+# and regenerate the vault immediately before provisioning.
+brahmaloka_registration_token: |
+  op://Admin-Project-Brahmanda/GitHub-Runner-Registration-Token/password
+
+# 1Password Service Account Token for the Runner
+vault_op_service_account_token: |
+  op://Admin-Project-Brahmanda/b4i5a34lefhlo3dbavpka67aaq/credential
