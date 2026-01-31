@@ -7,6 +7,40 @@ data "onepassword_item" "proxmox_credentials" {
   title = "Proxmox-samsara-iac"
 }
 
+data "onepassword_item" "upstash" {
+  vault = "Project-Brahmanda"
+  title = "Upstash-Sanchay-Token"
+}
+
+locals {
+  # Extract Upstash credentials
+  upstash_fields = flatten([
+    for s in data.onepassword_item.upstash.section : s.field
+  ])
+  
+  upstash_url   = one([for f in local.upstash_fields : f.value if f.label == "UPSTASH_REDIS_REST_URL"])
+  upstash_token = one([for f in local.upstash_fields : f.value if f.label == "UPSTASH_REDIS_REST_TOKEN"])
+}
+
+# Fetch the current lock state from Upstash
+data "http" "lock_check" {
+  url = "${local.upstash_url}/GET/brahmanda_lock_vyom"
+  request_headers = {
+    Authorization = "Bearer ${local.upstash_token}"
+  }
+}
+
+# Lock Enforcement Guard
+resource "null_resource" "lock_guard" {
+  lifecycle {
+    precondition {
+      # The .result field in Upstash response contains the value (Job ID)
+      condition     = jsondecode(data.http.lock_check.response_body).result == var.brahmanda_job_id
+      error_message = "❌ FATAL: Deployment Lock mismatch! The lock in Redis does not match 'var.brahmanda_job_id'. You must run this via 'make vyom'. Current holder: ${jsondecode(data.http.lock_check.response_body).result}"
+    }
+  }
+}
+
 # Proxmox Provider Configuration
 provider "proxmox" {
   endpoint = var.proxmox_endpoint

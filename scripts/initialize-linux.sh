@@ -64,13 +64,14 @@ install_prerequisites() {
      dpkg -l | grep -qw software-properties-common && \
      dpkg -l | grep -qw wget && \
      dpkg -l | grep -qw curl && \
+     dpkg -l | grep -qw jq && \
      dpkg -l | grep -qw xorriso; then
     info "Prerequisites already installed, skipping"
     return 0
   fi
   
   sudo apt-get update
-  sudo apt-get install -y gnupg software-properties-common wget curl xorriso
+  sudo apt-get install -y gnupg software-properties-common wget curl jq xorriso
   success "Prerequisites installed"
 }
 

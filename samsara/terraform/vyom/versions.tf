@@ -8,6 +8,12 @@ terraform {
     proxmox = {
       source = "bpg/proxmox"
     }
+    http = {
+      source = "hashicorp/http"
+    }
+    null = {
+      source = "hashicorp/null"
+    }
   }
 
   backend "s3" {

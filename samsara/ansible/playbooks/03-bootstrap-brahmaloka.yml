@@ -11,6 +11,7 @@
   # Load variables hierarchy:
   # 1. Group Vars (Common settings)
   vars_files:
+    - ../group_vars/brahmanda/vault.yml
     - ../group_vars/brahmaloka/vars.yml
     - ../group_vars/brahmaloka/vault.yml
 
@@ -20,6 +21,17 @@
   # Phase 0: Validation & Connection
   # ---------------------------------------------------------------------------
   pre_tasks:
+    - name: 🛡️ Verify Distributed Lock Ownership
+      ansible.builtin.uri:
+        url: "{{ upstash_url | trim }}/GET/brahmanda_lock_brahmaloka"
+        headers:
+          Authorization: "Bearer {{ upstash_token | trim }}"
+        return_content: true
+      register: lock_status
+      failed_when: lock_status.json.result != (brahmanda_job_id | default('MANUAL_RUN'))
+      delegate_to: localhost
+      run_once: true
+
     - name: ⏳ Wait for SSH Connection
       wait_for_connection:
         delay: 5

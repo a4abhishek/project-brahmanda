@@ -86,10 +86,10 @@ Locking is orchestrated by the Makefile using curl to interact with the Upstash 
 
 Store these credentials in the Project-Brahmanda vault.
 
-* **Item Name:** Upstash Redis - Brahmanda
+* **Item Name:** `Upstash-Sanchay-Token`
 * **Fields:**
-  * url: (The REST URL, e.g., <https://funny-monkey-32145.upstash.io>)
-  * token: (The long alphanumeric bearer token)
+  * `UPSTASH_REDIS_REST_URL`: (The REST URL, e.g., <https://funny-monkey-32145.upstash.io>)
+  * `UPSTASH_REDIS_REST_TOKEN`: (The long alphanumeric bearer token)
 
 #### **3. Identity Generation (BRAHMANDA_JOB_ID)**
 
@@ -108,15 +108,15 @@ export BRAHMANDA_JOB_ID
 
 #### **4. The Locking Workflow (Makefile)**
 
-The lock uses the Redis SET command with NX (Not Exists) and PX (Expire Time) options.
+The lock uses the Redis SET command with NX (Not Exists) and PX (Expire Time) options. The implementation uses a robust `trap` mechanism to ensure locks are released even on failure.
 
-**Step 1: Acquire Lock (SET NX PX)**
+**Step 1: Acquire Lock in Makefile (SET NX PX)**
 
-* **Logic:** Try to set a key. If it exists, fail. If not, set it with a **15-minute TTL** (to cover Vyom provisioning).
+* **Logic:** Try to set a key unique to the target (e.g., `brahmanda_lock_kshitiz`). If it exists, fail. If not, set it with a **15-minute TTL**.
 * **Command:**
 
   ```bash
-  curl -X POST "$UPSTASH_URL/SET/brahmanda_lock_vyom/$BRAHMANDA_JOB_ID/NX/PX/900000" \
+  curl -X POST "$UPSTASH_URL/SET/$LOCK_KEY/$BRAHMANDA_JOB_ID/NX/PX/900000" \
   -H "Authorization: Bearer $UPSTASH_TOKEN"
   ```
 
@@ -124,24 +124,18 @@ The lock uses the Redis SET command with NX (Not Exists) and PX (Expire Time) op
   * "OK" ➡️ **Proceed.** Lock acquired.
   * `null` (or `nil`) ➡️ **Abort.** Another job holds the lock.
 
-**Step 2: Execute (With Verification)**
+**Step 2: Execute Terraform + Ansible (Atomic Unit)**
 
-* Run `terraform apply -var="brahmanda_job_id=$BRAHMANDA_JOB_ID".`
-* Run `ansible-playbook -e "brahmanda_job_id=$BRAHMANDA_JOB_ID".`
+* Execute the payload (Terraform + Ansible) inside a shell block.
+* Pass `brahmanda_job_id` to Terraform variables and Ansible extra-vars.
+  * Run `terraform apply -var="brahmanda_job_id=$BRAHMANDA_JOB_ID".`
+  * Run `ansible-playbook -e "brahmanda_job_id=$BRAHMANDA_JOB_ID".`
+* **Verification:** Both tools query the lock value from Upstash and abort if it does not match `brahmanda_job_id` (this handles cases where the lock doesn't exist or is owned by another job).
 
-**Step 3: Release Lock (DEL)**
+**Step 3: Release Lock in Makefile (DEL)**
 
 * **Logic:** Delete the key to free the lock for the next run.
-* **Command:**
-
-  ```bash
-  # Optional Safety: Check value matches $BRAHMANDA_JOB_ID before deleting (Lua script)
-  # Basic Implementation:
-  curl -X POST "$UPSTASH_URL/DEL/brahmanda_lock_vyom" \
-       -H "Authorization: Bearer $UPSTASH_TOKEN"
-  ```
-
-* **Safety:** This is placed inside a trap block to guarantee execution.
+* **Mechanism:** Implemented via `trap release_lock EXIT` in the Makefile macro to guarantee execution on success, failure, or interrupt.
 
 ### **C. Defense in Depth (Native Enforcement)**
 
@@ -160,27 +154,31 @@ variable "brahmanda_job_id" {
 # Fetch Upstash secrets via 1Password Provider (ADR-003)
 data "onepassword_item" "upstash" {
   vault = "Project-Brahmanda"
-  title = "Upstash Redis - Brahmanda"
+  title = "Upstash-Sanchay-Token"
+}
+
+locals {
+  # Extract fields from 1Password item
+  upstash_fields = flatten([for s in data.onepassword_item.upstash.section : s.field])
+  upstash_url    = one([for f in local.upstash_fields : f.value if f.label == "UPSTASH_REDIS_REST_URL"])
+  upstash_token  = one([for f in local.upstash_fields : f.value if f.label == "UPSTASH_REDIS_REST_TOKEN"])
 }
 
 data "http" "lock_check" {
-  url = "${data.onepassword_item.upstash.url}/GET/brahmanda_lock_vyom"
+  url = "${local.upstash_url}/GET/brahmanda_lock_kshitiz"
   request_headers = {
-    Authorization = "Bearer ${data.onepassword_item.upstash.token}"
+    Authorization = "Bearer ${local.upstash_token}"
   }
 }
 
 # Lifecycle Precondition (Terraform 1.2+)
 resource "null_resource" "lock_guard" {
-  triggers = {
-    always_run = timestamp()
-  }
-
   lifecycle {
     precondition {
-      # Verify the lock value in Redis matches the Job ID passed to Terraform
+      # Verify the lock value in Redis matches the Job ID passed to Terraform.
+      # If the key doesn't exist, result is null, causing mismatch failure.
       condition     = jsondecode(data.http.lock_check.response_body).result == var.brahmanda_job_id
-      error_message = "❌ FATAL: Deployment Lock mismatch! The lock in Redis does not match 'var.brahmanda_job_id'. You must run this via 'make srishti'."
+      error_message = "❌ FATAL: Deployment Lock mismatch! The lock in Redis does not match 'var.brahmanda_job_id'. You must run this via 'make kshitiz'."
     }
   }
 }
@@ -194,7 +192,7 @@ Using a pre_task to assert lock ownership.
   pre_tasks:
     - name: 🛡️ Verify Distributed Lock Ownership
       uri:
-        url: "{{ upstash_url }}/GET/brahmanda_lock_vyom"
+        url: "{{ upstash_url }}/GET/brahmanda_lock_kshitiz"
         headers:
           Authorization: "Bearer {{ upstash_token }}"
         return_content: true

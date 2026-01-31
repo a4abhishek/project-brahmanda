@@ -15,6 +15,7 @@
   # Load variables hierarchy:
   # 1. Group Vars (Common settings)
   vars_files:
+    - ../group_vars/brahmanda/vault.yml
     - ../group_vars/vyom/vars.yml
     - ../group_vars/vyom/vault.yml
 
@@ -72,6 +73,17 @@
   # Phase 0: Validation & Preparation
   # ---------------------------------------------------------------------------
   pre_tasks:
+    - name: 🛡️ Verify Distributed Lock Ownership
+      ansible.builtin.uri:
+        url: "{{ upstash_url | trim }}/GET/brahmanda_lock_vyom"
+        headers:
+          Authorization: "Bearer {{ upstash_token | trim }}"
+        return_content: true
+      register: lock_status
+      failed_when: lock_status.json.result != (brahmanda_job_id | default('MANUAL_RUN'))
+      delegate_to: localhost
+      run_once: true
+
     - name: 🛡️ Validate Root Disk Size (Pre-Flight)
       assert:
         that:

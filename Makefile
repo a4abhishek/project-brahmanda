@@ -15,6 +15,9 @@ endif
 # --- Configuration ---
 # Default target to run when no target is specified.
 .DEFAULT_GOAL := help
+# .ONESHELL ensures the entire recipe runs in a single shell instance.
+# This is required for the heredoc in WITH_LOCK to work correctly.
+.ONESHELL:
 
 SHELL := /bin/bash
 INSTALL_SCRIPT := ./scripts/install_tools.sh
@@ -24,15 +27,71 @@ INSTALL_SCRIPT := ./scripts/install_tools.sh
 export ANSIBLE_CONFIG := $(CURDIR)/samsara/ansible/ansible.cfg
 ANSIBLE_ENV := ANSIBLE_CONFIG=$(ANSIBLE_CONFIG)
 
+# --- Distributed Locking (ADR-007) ---
+# Unique ID for the current execution session
+BRAHMANDA_JOB_ID ?= $(if $(GITHUB_RUN_ID),gh_$(GITHUB_RUN_ID),local_$(shell date +%s))
+export BRAHMANDA_JOB_ID
+
+# Helper to execute a command with a distributed lock
+# Usage: $(call WITH_LOCK,target_name,command_block)
+# Note: We use <<'BASH' (quoted) to prevent the parent shell from expanding variables.
+# We use $$ for shell variables so Make passes a single $ to the shell.
+# IMPORTANT: The 'command_block' argument MUST NOT contain commas (,), as Make uses them to split arguments.
+define WITH_LOCK
+	@TARGET='$(1)' JOB_ID='$(BRAHMANDA_JOB_ID)' bash -euo pipefail <<'BASH'
+echo "🔒 [$${TARGET}] Attempting to acquire distributed lock (Job: $${JOB_ID})..."
+
+UPSTASH_URL=$$(op read 'op://Project-Brahmanda/Upstash-Sanchay-Token/UPSTASH_REDIS_REST_URL')
+UPSTASH_TOKEN=$$(op read 'op://Project-Brahmanda/Upstash-Sanchay-Token/UPSTASH_REDIS_REST_TOKEN')
+
+if [ -z "$${UPSTASH_URL}" ] || [ -z "$${UPSTASH_TOKEN}" ]; then
+  echo "❌ ERROR: Failed to retrieve Upstash credentials from 1Password."
+  exit 1
+fi
+
+LOCK_KEY="brahmanda_lock_$${TARGET}"
+
+# Upstash REST: Try to set the lock
+RESP=$$(curl -sS -X POST "$${UPSTASH_URL}/SET/$${LOCK_KEY}/$${JOB_ID}/NX/PX/900000" -H "Authorization: Bearer $${UPSTASH_TOKEN}" || true)
+RESULT=$$(echo "$${RESP}" | jq -r '.result // empty' 2>/dev/null || true)
+
+if [ "$${RESULT}" = "OK" ]; then
+  : # ok
+elif echo "$${RESP}" | grep -q "OK"; then
+  : # ok (fallback)
+else
+  CURRENT_HOLDER=$$(curl -sS -X GET "$${UPSTASH_URL}/GET/$${LOCK_KEY}" -H "Authorization: Bearer $${UPSTASH_TOKEN}" | jq -r '.result // empty' 2>/dev/null || true)
+  echo "❌ ERROR: Failed to acquire lock. Target [$${TARGET}] is currently locked by: $${CURRENT_HOLDER}"
+  exit 1
+fi
+
+echo "✅ [$${TARGET}] Lock acquired."
+
+release_lock() {
+  echo ""
+  echo "🔓 [$${TARGET}] Releasing lock... ($${LOCK_KEY})"
+  curl -sS -X POST "$${UPSTASH_URL}/DEL/$${LOCK_KEY}" -H "Authorization: Bearer $${UPSTASH_TOKEN}" >/dev/null 2>&1 || true
+  echo "✅ [$${TARGET}] Lock released."
+}
+
+trap release_lock EXIT
+
+# ---- body ----
+$(2)
+# ---- /body ----
+BASH
+endef
 
 # --- Phony Targets ---
 # These targets do not represent files.
-.PHONY: help check_tools install_tools check_auth init nidhi-tirodhana nidhi-avirbhava samshodhana nidhi-nikasha pratistha samskara mukti srishti kshitiz vyom pralaya
+.PHONY: help check_tools install_tools check_auth init \
+	nidhi-tirodhana nidhi-avirbhava samshodhana nidhi-nikasha \
+	pratistha samskara mukti srishti kshitiz vyom brahmaloka pralaya kubeconfig
 
 # --- Main Targets ---
 
 help:
-	@echo "🕉️ Project Brahmanda Makefile"
+	@echo "🕉️  Project Brahmanda Makefile"
 	@echo ""
 	@echo "Usage: make [target]"
 	@echo ""
@@ -47,11 +106,13 @@ help:
 	@echo "Partial Targets:"
 	@echo "  kshitiz       : ☁️  Provisions or updates the Edge layer (AWS Lightsail)."
 	@echo "  vyom          : 🏠  Provisions or updates the Compute layer (Proxmox VMs)."
+	@echo "  brahmaloka    : 🏗️  Provisions the Orchestration layer (Github Runners/Control)."
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  install_tools : 🛠️  Installs necessary CLI tools (Terraform, Ansible, 1Password CLI)."
 	@echo "  check_tools   : ✅  Verifies that all required tools are installed."
 	@echo "  check_auth    : 🔑  Verifies that the 1Password CLI is authenticated."
+	@echo "  kubeconfig    : ☸️  Fetches the Kubeconfig from the Vyom Control Plane."
 	@echo "  help          : 📖  Shows this help message."
 	@echo ""
 	@echo "Vault Management:"
@@ -61,7 +122,7 @@ help:
 	@echo "  nidhi-nikasha   : 🪨💎  (Treasury Touchstone Test) Verifies all vaults can be decrypted."
 	@echo ""
 	@echo "Parameters:"
-	@echo "  VAULT=<name>           : Target specific vault (brahmanda|kshitiz|vyom)."
+	@echo "  VAULT=<name>          : Target specific vault (brahmanda|kshitiz|vyom)."
 	@echo "                           If omitted: nidhi-tirodhana/nidhi-avirbhava process all vaults."
 	@echo "                           Required for: samshodhana (cannot edit multiple)."
 	@echo "                           Example: make samshodhana VAULT=kshitiz"
@@ -203,6 +264,7 @@ check_tools:
 	@$(if $(shell command -v mkfs.exfat),,$(error "exfatprogs not found. Please run 'make install_tools' or install it manually."))
 	@$(if $(shell command -v mkfs.ntfs),,$(error "ntfs-3g not found. Please run 'make install_tools' or install it manually."))
 	@$(if $(shell command -v mkfs.vfat),,$(error "dosfstools not found. Please run 'make install_tools' or install it manually."))
+	@$(if $(shell command -v jq),,$(error "jq not found. Please run 'make install_tools' or install it manually."))
 	@echo "SUCCESS: All required tools are installed."
 
 install_tools:
@@ -326,13 +388,15 @@ mukti:
 srishti:
 	@echo "🕉️  Manifesting the Brahmanda..."
 	@echo "INFO: This process will provision the Kshitiz (Edge) and Vyom (Compute) layers."
-	@$(MAKE) kshitiz && $(MAKE) vyom
+	$(call WITH_LOCK,srishti, \
+		$(MAKE) kshitiz; \
+		$(MAKE) vyom; \
+	)
 	@echo "🕉️  SUCCESS: Srishti (Creation) is complete. The Brahmanda has been manifested."
 
 kshitiz:
 	@echo "☁️  Provisioning Kshitiz (Edge Layer)..."
-	@/bin/bash -c ' \
-		set -e; \
+	$(call WITH_LOCK,kshitiz, \
 		echo "--------------------------------------------------------------------------------"; \
 		echo "🚀  PHASE 1: Provisioning Kshitiz with Terraform..."; \
 		echo "--------------------------------------------------------------------------------"; \
@@ -343,7 +407,7 @@ kshitiz:
 		R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
 		if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
 			echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
-			echo "   Ensure item 'Cloudflare-Sanchay-Token' exists with fields: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT"; \
+			echo "   Ensure item Cloudflare-Sanchay-Token exists with fields: R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_ENDPOINT"; \
 			exit 1; \
 		fi; \
 		echo "INFO: Running Terraform for the Lightsail instance..."; \
@@ -351,35 +415,37 @@ kshitiz:
 			-backend-config="access_key=$$R2_ACCESS_KEY" \
 			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
 			-backend-config="endpoint=$$R2_ENDPOINT" \
-			&& terraform apply -auto-approve); \
+			&& terraform apply -auto-approve -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
 		echo ""; \
 		echo "--------------------------------------------------------------------------------"; \
 		echo "🚀  PHASE 2: Configuring Kshitiz with Ansible..."; \
 		echo "--------------------------------------------------------------------------------"; \
 		echo ""; \
 		echo "INFO: Preparing to configure Kshitiz..."; \
-		KEY_FILE="/tmp/kshitiz_ssh_key_$$$$"; \
-		cleanup() { \
-			echo "INFO: Cleaning up temporary SSH key..."; \
-			rm -f "$$KEY_FILE"; \
-		}; \
-		trap cleanup EXIT; \
-		echo "INFO: Materializing SSH key for Kshitiz..."; \
-		op read "op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
-		chmod 600 "$$KEY_FILE"; \
-		echo "INFO: Running Ansible to configure Kshitiz..."; \
-		(cd samsara/ansible && \
-			$(ANSIBLE_ENV) ansible-playbook playbooks/01-bootstrap-kshitiz.yml \
-			--private-key="$$KEY_FILE" \
-			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
+		( \
+			KEY_FILE="/tmp/kshitiz_ssh_key_$$$$"; \
+			cleanup() { \
+				echo "INFO: Cleaning up temporary SSH key..."; \
+				rm -f "$$KEY_FILE"; \
+			}; \
+			trap cleanup EXIT; \
+			echo "INFO: Materializing SSH key for Kshitiz..."; \
+			op read "op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
+			chmod 600 "$$KEY_FILE"; \
+			echo "INFO: Running Ansible to configure Kshitiz..."; \
+			(cd samsara/ansible && \
+				$(ANSIBLE_ENV) ansible-playbook playbooks/01-bootstrap-kshitiz.yml \
+				--private-key="$$KEY_FILE" \
+				-e "brahmanda_job_id=$(BRAHMANDA_JOB_ID)" \
+				--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
+			); \
 		); \
-	'
+	)
 	@echo "🕉️  SUCCESS: Kshitiz has been manifested."
 
 vyom:
 	@echo "🏠  Provisioning Vyom (Compute Layer)..."
-	@/bin/bash -c ' \
-		set -e; \
+	$(call WITH_LOCK,vyom, \
 		echo "--------------------------------------------------------------------------------"; \
 		echo "🚀  PHASE 1: Provisioning Vyom Nodes with Terraform..."; \
 		echo "--------------------------------------------------------------------------------"; \
@@ -390,7 +456,7 @@ vyom:
 		R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
 		if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
 			echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
-			echo "   Ensure item 'Cloudflare-Sanchay-Token' exists with fields: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT"; \
+			echo "   Ensure item Cloudflare-Sanchay-Token exists with fields: R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_ENDPOINT"; \
 			exit 1; \
 		fi; \
 		echo "INFO: Running Terraform for the Proxmox VMs..."; \
@@ -398,35 +464,37 @@ vyom:
 			-backend-config="access_key=$$R2_ACCESS_KEY" \
 			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
 			-backend-config="endpoint=$$R2_ENDPOINT" \
-			&& terraform apply -auto-approve); \
+			&& terraform apply -auto-approve -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
 		echo ""; \
 		echo "--------------------------------------------------------------------------------"; \
 		echo "🚀  PHASE 2: Configuring Vyom Cluster with Ansible..."; \
 		echo "--------------------------------------------------------------------------------"; \
 		echo ""; \
 		echo "INFO: Preparing to configure Vyom nodes..."; \
-		KEY_FILE="/tmp/prakriti_master_key_$$$$"; \
-		cleanup() { \
-			echo "INFO: Cleaning up temporary SSH key for Vyom..."; \
-			rm -f "$$KEY_FILE"; \
-		}; \
-		trap cleanup EXIT; \
-		echo "INFO: Materializing Prakriti Master Key for Vyom..."; \
-		op read "op://Project-Brahmanda/Prakriti Master Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
-		chmod 600 "$$KEY_FILE"; \
-		echo "INFO: Running Ansible to bootstrap the Kubernetes cluster..."; \
-		(cd samsara/ansible && \
-			$(ANSIBLE_ENV) ansible-playbook playbooks/02-bootstrap-vyom.yml \
-			--private-key="$$KEY_FILE" \
-			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
+		( \
+			KEY_FILE="/tmp/prakriti_master_key_$$$$"; \
+			cleanup() { \
+				echo "INFO: Cleaning up temporary SSH key for Vyom..."; \
+				rm -f "$$KEY_FILE"; \
+			}; \
+			trap cleanup EXIT; \
+			echo "INFO: Materializing Prakriti Master Key for Vyom..."; \
+			op read "op://Project-Brahmanda/Prakriti Master Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
+			chmod 600 "$$KEY_FILE"; \
+			echo "INFO: Running Ansible to bootstrap the Kubernetes cluster..."; \
+			(cd samsara/ansible && \
+				$(ANSIBLE_ENV) ansible-playbook playbooks/02-bootstrap-vyom.yml \
+				--private-key="$$KEY_FILE" \
+				-e "brahmanda_job_id=$(BRAHMANDA_JOB_ID)" \
+				--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
+			); \
 		); \
-	'
+	)
 	@echo "🕉️  SUCCESS: Vyom has been manifested."
 
 brahmaloka:
 	@echo "🏗️  Provisioning Brahmaloka (Orchestration Layer)..."
-	@/bin/bash -c ' \
-		set -e; \
+	$(call WITH_LOCK,brahmaloka, \
 		echo "--------------------------------------------------------------------------------"; \
 		echo "🚀  PHASE 1: Provisioning Brahmaloka with Terraform..."; \
 		echo "--------------------------------------------------------------------------------"; \
@@ -447,7 +515,7 @@ brahmaloka:
 			-backend-config="access_key=$$R2_ACCESS_KEY" \
 			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
 			-backend-config="endpoint=$$R2_ENDPOINT" \
-			&& terraform apply -auto-approve -var="ssh_public_key_path=$$SSH_PUB_KEY_FILE"); \
+			&& terraform apply -auto-approve -var="ssh_public_key_path=$$SSH_PUB_KEY_FILE" -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
 		rm -f "$$SSH_PUB_KEY_FILE"; \
 		echo ""; \
 		echo "--------------------------------------------------------------------------------"; \
@@ -455,22 +523,25 @@ brahmaloka:
 		echo "--------------------------------------------------------------------------------"; \
 		echo ""; \
 		echo "INFO: Preparing to configure Brahmaloka..."; \
-		KEY_FILE="/tmp/brahmaloka_priv_key_$$$$"; \
-		cleanup() { \
-			echo "INFO: Cleaning up temporary SSH keys..."; \
-			rm -f "$$KEY_FILE"; \
-		}; \
-		trap cleanup EXIT; \
-		echo "INFO: Materializing Brahmaloka Private Key..."; \
-		op read "op://Admin-Project-Brahmanda/Brahmaloka-SSH-Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
-		chmod 600 "$$KEY_FILE"; \
-		echo "INFO: Running Ansible to configure the Runner..."; \
-		(cd samsara/ansible && \
-			$(ANSIBLE_ENV) ansible-playbook playbooks/03-bootstrap-brahmaloka.yml \
-			--private-key="$$KEY_FILE" \
-			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
+		( \
+			KEY_FILE="/tmp/brahmaloka_priv_key_$$$$"; \
+			cleanup_key() { \
+				echo "INFO: Cleaning up temporary SSH keys..."; \
+				rm -f "$$KEY_FILE" "$$SSH_PUB_KEY_FILE"; \
+			}; \
+			trap cleanup_key EXIT; \
+			echo "INFO: Materializing Brahmaloka Private Key..."; \
+			op read "op://Admin-Project-Brahmanda/Brahmaloka-SSH-Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
+			chmod 600 "$$KEY_FILE"; \
+			echo "INFO: Running Ansible to configure the Runner..."; \
+			(cd samsara/ansible && \
+				$(ANSIBLE_ENV) ansible-playbook playbooks/03-bootstrap-brahmaloka.yml \
+				--private-key="$$KEY_FILE" \
+				-e "brahmanda_job_id=$(BRAHMANDA_JOB_ID)" \
+				--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
+			); \
 		); \
-	'
+	)
 	@echo "🕉️  SUCCESS: Brahmaloka has been manifested."
 
 kubeconfig:

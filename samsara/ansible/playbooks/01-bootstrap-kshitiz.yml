@@ -3,6 +3,7 @@
   hosts: kshitiz
   become: true  # This tells Ansible to use 'sudo' for the tasks.
   vars_files: # This tells ansible exactly in which order to load variable files. It is a good practice.
+    - ../group_vars/brahmanda/vault.yml
     - ../group_vars/kshitiz/vars.yml
     - ../group_vars/kshitiz/vault.yml
 
@@ -12,6 +13,17 @@
     - import_tasks: ../handlers/main.yml
 
   tasks:
+    - name: 🛡️ Verify Distributed Lock Ownership
+      ansible.builtin.uri:
+        url: "{{ upstash_url | trim }}/GET/brahmanda_lock_kshitiz"
+        headers:
+          Authorization: "Bearer {{ upstash_token | trim }}"
+        return_content: true
+      register: lock_status
+      failed_when: lock_status.json.result != (brahmanda_job_id | default('MANUAL_RUN'))
+      delegate_to: localhost
+      run_once: true
+
     - name: 🛡️ Validate Root Disk Size (Pre-Flight)
       assert:
         that:

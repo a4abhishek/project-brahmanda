@@ -34,5 +34,9 @@ variable "template_name" {
 variable "ssh_public_key_path" {
   description = "Path to the SSH public key to inject into the VM"
   type        = string
-  default     = "~/.ssh/id_brahmaloka.pub"
+}
+
+variable "brahmanda_job_id" {
+  description = "The unique ID of the current automation job, used for distributed locking"
+  type        = string
 }

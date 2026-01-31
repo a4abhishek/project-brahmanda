@@ -30,3 +30,8 @@ variable "template_name" {
   type        = string
   default     = "prakriti-template"
 }
+
+variable "brahmanda_job_id" {
+  description = "The unique ID of the current automation job, used for distributed locking"
+  type        = string
+}

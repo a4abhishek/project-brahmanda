@@ -58,3 +58,8 @@ variable "lighthouse_nebula_ip" {
   type        = string
   default     = "10.42.0.1/16"
 }
+
+variable "brahmanda_job_id" {
+  description = "The unique ID of the current automation job, used for distributed locking"
+  type        = string
+}

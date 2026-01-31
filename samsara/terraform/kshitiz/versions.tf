@@ -9,6 +9,12 @@ terraform {
     onepassword = {
       source = "1Password/onepassword"
     }
+    http = {
+      source = "hashicorp/http"
+    }
+    null = {
+      source = "hashicorp/null"
+    }
   }
 
   backend "s3" {
