@@ -83,6 +83,7 @@
       failed_when: lock_status.json.result != (brahmanda_job_id | default('MANUAL_RUN'))
       delegate_to: localhost
       run_once: true
+      become: false
 
     - name: 🛡️ Validate Root Disk Size (Pre-Flight)
       assert:

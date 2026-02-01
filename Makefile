@@ -86,7 +86,8 @@ endef
 # These targets do not represent files.
 .PHONY: help check_tools install_tools check_auth init \
 	nidhi-tirodhana nidhi-avirbhava samshodhana nidhi-nikasha \
-	pratistha samskara mukti srishti kshitiz vyom brahmaloka pralaya kubeconfig
+	pratistha samskara mukti srishti kshitiz vyom brahmaloka kubeconfig \
+	pralaya-kshitiz pralaya-vyom pralaya-brahmaloka pralaya-achala maha-pralaya avyakta
 
 # --- Main Targets ---
 
@@ -570,16 +571,69 @@ kubeconfig:
 	@echo "Usage: export KUBECONFIG=~/.kube/config-vyom"
 	@echo "       kubectl get nodes"
 
-pralaya:
-	@echo "🔥  Invoking Pralaya (Dissolution)..."
-	@echo "WARNING: This will destroy all infrastructure managed by this project."
-	@echo "INFO: The Kshitiz Static IP will NOT be deleted and remains persisted in AWS."
-	@read -p "Are you sure you want to proceed? [y/N] " confirm && [[ $$confirm == [yY] || $$confirm == [yY][eE][sS] ]] || exit 1
-	@echo "INFO: Destroying Vyom (Compute Layer)..."
-	#(cd samsara/terraform/vyom && terraform destroy -auto-approve)
-	@echo "INFO: Destroying Kshitiz (Edge Layer)..."
-	#(cd samsara/terraform/kshitiz && terraform destroy -auto-approve)
-	@echo "SUCCESS: Pralaya is complete. The universe has returned to the void."
+pralaya-kshitiz:
+	@echo "🔥  Destroying Kshitiz (Edge Layer)..."
+	$(call WITH_LOCK,kshitiz, \
+		echo "INFO: Fetching R2 Backend Credentials..."; \
+		R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
+		R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
+		R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
+		if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
+			echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
+			exit 1; \
+		fi; \
+		echo "INFO: Destroying Kshitiz Resources..."; \
+		(cd samsara/terraform/kshitiz && terraform init -upgrade \
+			-backend-config="access_key=$$R2_ACCESS_KEY" \
+			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
+			-backend-config="endpoint=$$R2_ENDPOINT" \
+			&& terraform destroy -auto-approve -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
+	)
+	@echo "💥  Kshitiz destroyed."
+
+pralaya-vyom:
+	@echo "🔥  Destroying Vyom (Compute Layer)..."
+	$(call WITH_LOCK,vyom, \
+		echo "INFO: Fetching R2 Backend Credentials..."; \
+		R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
+		R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
+		R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
+		if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
+			echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
+			exit 1; \
+		fi; \
+		echo "INFO: Destroying Vyom Resources..."; \
+		(cd samsara/terraform/vyom && terraform init -upgrade \
+			-backend-config="access_key=$$R2_ACCESS_KEY" \
+			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
+			-backend-config="endpoint=$$R2_ENDPOINT" \
+			&& terraform destroy -auto-approve -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
+	)
+	@echo "💥  Vyom destroyed."
+
+pralaya-brahmaloka:
+	@echo "🔥  Destroying Brahmaloka (Orchestration Layer)..."
+	$(call WITH_LOCK,brahmaloka, \
+		echo "INFO: Fetching R2 Backend Credentials..."; \
+		R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
+		R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
+		R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
+		if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
+			echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
+			exit 1; \
+		fi; \
+		echo "INFO: Fetching Brahmaloka Public Key (Required for destruction plan)..."; \
+		SSH_PUB_KEY_FILE="/tmp/brahmaloka_pub_key_$$$$"; \
+		op read "op://Admin-Project-Brahmanda/Brahmaloka-SSH-Key/public key" > "$$SSH_PUB_KEY_FILE"; \
+		echo "INFO: Destroying Brahmaloka Resources..."; \
+		(cd samsara/terraform/brahmaloka && terraform init -upgrade \
+			-backend-config="access_key=$$R2_ACCESS_KEY" \
+			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
+			-backend-config="endpoint=$$R2_ENDPOINT" \
+			&& terraform destroy -auto-approve -var="ssh_public_key_path=$$SSH_PUB_KEY_FILE" -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
+		rm -f "$$SSH_PUB_KEY_FILE"; \
+	)
+	@echo "💥  Brahmaloka destroyed."
 
 pralaya-achala:
 	@echo "🔥  Destroying Achala (Persistent Infrastructure)..."
@@ -596,7 +650,18 @@ pralaya-achala:
 			-backend-config="endpoint=$$R2_ENDPOINT" \
 			&& terraform destroy -auto-approve); \
 	'
-	@echo "Achala (Persistent infrastructure) destroyed."
+	@echo "💥  Achala entities are now destroyed."
 
-maha-pralaya: pralaya pralaya-achala
-	@echo "💥  Maha-Pralaya Complete. The Void reigns."
+pralaya:
+	@echo "🔥  Invoking Pralaya (Dissolution)..."
+	@echo "WARNING: This will destroy the transient universe (Kshitiz & Vyom)."
+	@echo "INFO: Brahmaloka (Orchestrator) and Achala (Static IP) will be preserved."
+	@read -p "Are you sure you want to proceed? [y/N] " confirm && [[ $$confirm == [yY] || $$confirm == [yY][eE][sS] ]] || exit 1
+	@$(MAKE) pralaya-vyom
+	@$(MAKE) pralaya-kshitiz
+	@echo "💥  Pralaya is complete. The universe has returned to the void."
+
+avyakta: pralaya pralaya-brahmaloka pralaya-achala
+	@echo "🌀  Maha-Pralaya Complete. Brahmanda has returned to Avyakta (the unmanifested state)."
+
+maha-pralaya: avyakta
