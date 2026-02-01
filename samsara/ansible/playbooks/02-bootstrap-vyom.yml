@@ -94,10 +94,9 @@
 
     - name: 🛡️ Verify Identity Existence
       fail:
-        msg: "Identity missing for {{ inventory_hostname }}. Ensure 'vault_nebula_cert' and 'vault_nebula_key' are defined in host_vars."
-      when: vault_nebula_cert is undefined or vault_nebula_key is undefined
-      # Note: vault_nebula_* vars currently mapped from nebula_node_* in group_vars, so this check might need adjustment if using group vars directly.
-      # Simplified check for now based on what we know exists:
+        msg: "Identity missing for {{ inventory_hostname }}. Ensure 'nebula_node_crt' and 'nebula_node_key' are defined."
+      when: nebula_node_crt is undefined or nebula_node_key is undefined
+      # Note: variables mapped from group_vars/vyom/vault.yml
       ignore_errors: true
 
     - name: 🔍 Check Installed Nebula Version
@@ -161,10 +160,10 @@
     # -------------------------------------------------------------------------
     # Phase 2: The Bridge (Discovery)
     # -------------------------------------------------------------------------
-    - name: 🔄 Refresh Ansible Facts (Discover nebula0)
+    - name: 🔄 Refresh Ansible Facts (Discover nebula1)
       ansible.builtin.setup:
-      # Forces Ansible to see the newly created 'nebula0' interface
-      # Otherwise 'ansible_nebula0' will remain undefined.
+      # Forces Ansible to see the newly created 'nebula1' interface
+      # Otherwise 'ansible_facts.nebula1' will remain undefined.
 
     # -------------------------------------------------------------------------
     # Phase 3: The Cluster (K3s)
@@ -185,9 +184,9 @@
           # Secure the API Server with multiple identities
           tls-san:
             # A. The Secure Backdoor (For Lighthouse & Remote kubectl)
-            - "{{ ansible_nebula0.ipv4.address }}"
+            - "{{ ansible_facts.nebula1.ipv4.address }}"
             # B. The Local Door (For LAN access)
-            - "{{ ansible_default_ipv4.address }}"
+            - "{{ ansible_facts.default_ipv4.address }}"
             # C. The DNS Name (For Ingress)
             - "k3s.brahmanda.local"
 
@@ -210,4 +209,4 @@
   post_tasks:
     - name: ✅ Verify Node Identity
       debug:
-        msg: "Node {{ inventory_hostname }} active. LAN: {{ ansible_default_ipv4.address }}, Mesh: {{ ansible_nebula1.ipv4.address | default('Unknown') }}"
+        msg: "Node {{ inventory_hostname }} active. LAN: {{ ansible_facts.default_ipv4.address }}, Mesh: {{ ansible_facts.nebula1.ipv4.address | default('Unknown') }}"

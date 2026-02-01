@@ -121,6 +121,12 @@
         - Makefile
         - requirements.txt
 
+    - name: 🔐 Ensure Inventory is Executable
+      file:
+        path: "{{ brahmaloka_repo_path }}/samsara/ansible/inventory/dynamic_inventory.py"
+        mode: '0755'
+      # This fixes the "Failed to parse inventory" error in GitHub Actions
+
     - name: 🔑 Inject 1Password Service Account Token
       lineinfile:
         path: "/home/{{ brahmaloka_runner_user }}/.bashrc"
@@ -191,6 +197,11 @@
         chdir: "{{ brahmaloka_runner_dir }}"
       become: true
       ignore_errors: yes
+
+    - name: 🧹 Cleanup Bootstrap Repository
+      file:
+        path: "{{ brahmaloka_repo_path }}"
+        state: absent
 
   # ---------------------------------------------------------------------------
   # Phase 3: Identity Security (Identity Separation)

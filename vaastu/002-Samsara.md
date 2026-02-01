@@ -221,7 +221,13 @@ If brahmaloka-runner becomes unresponsive or the GitHub Token expires:
 * **Diagnose:** Check the pulse: `journalctl -u actions.runner.* -f`
 * **Reincarnate:** If the runner is broken beyond repair, update the token in 1Password and re-run **Phase 3** (The Incantation) from your laptop to destroy and recreate it.
 
-## 6. 🌟 Purnata (Conclusion)
+## 6. 🖼️ Visualization
+
+Below is a trace of the **Samsara Cycle** executing on the self-hosted runner. It demonstrates the distributed locking mechanism (Dharana) and the sequential execution of the manifestation targets.
+
+<img src="../.github/assets/samsara/samsara-cycle-with-github-actions.png" alt="Samsara Cycle with GitHub Actions" width="800">
+
+## 7. 🌟 Purnata (Conclusion)
 
 By establishing **Samsara**, we have completed the engine of the universe. The infrastructure is no longer a static collection of servers but a living, breathing cycle driven by code. We have detached the Creator (You) from the Creation (Vyom), allowing the system to sustain, heal, and evolve itself.
 

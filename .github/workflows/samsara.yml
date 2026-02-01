@@ -1,0 +1,55 @@
+name: ♾️ Samsara (The Cycle)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: # Allow manual trigger
+
+# Ensure only one pipeline runs at a time to prevent lock contention
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  manifest:
+    name: Manifest Brahmanda
+    runs-on: self-hosted
+    
+    # Use environment to separate dev/prod if needed later
+    environment: production
+
+    env:
+      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔑 Load Secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          # This token must be added to GitHub Repository Secrets
+          export-env: true
+        env:
+          # Map required secrets for the Makefile/IaC
+          # Format: ENV_VAR: op://Vault/Item/Field
+          AWS_ACCESS_KEY_ID: op://Project-Brahmanda/AWS-samsara-iac/AWS_ACCESS_KEY_ID
+          AWS_SECRET_ACCESS_KEY: op://Project-Brahmanda/AWS-samsara-iac/AWS_SECRET_ACCESS_KEY
+          R2_SECRET_ACCESS_KEY: op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY
+
+      - name: 🛤️ Configure PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: 🚀 Initialize Environment
+        run: |
+          # Ensure all tools are installed and up to date
+          make init
+
+      - name: 🔐 Fix Permissions
+        run: chmod +x samsara/ansible/inventory/dynamic_inventory.py
+
+      - name: 🕉️ Run Srishti (Creation Cycle)
+        run: |
+          # The runner already has tools installed via bootstrap
+          # We just need to invoke the manifestation
+          make srishti
