@@ -1,6 +1,6 @@
 # AWS Configuration
 variable "aws_region" {
-  description = "AWS region for Lightsail instance"
+  description = "AWS region for Lightsail instance (Linked to persistent infrastructure in samsara/terraform/persistence/)"
   type        = string
   default     = "ap-southeast-1" # Singapore
 }

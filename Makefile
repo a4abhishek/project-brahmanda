@@ -410,6 +410,12 @@ kshitiz:
 			echo "   Ensure item Cloudflare-Sanchay-Token exists with fields: R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_ENDPOINT"; \
 			exit 1; \
 		fi; \
+		echo "INFO: Running Terraform for Persistent Infrastructure..."; \
+		(cd samsara/terraform/persistence && terraform init -upgrade \
+			-backend-config="access_key=$$R2_ACCESS_KEY" \
+			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
+			-backend-config="endpoint=$$R2_ENDPOINT" \
+			&& terraform apply -auto-approve); \
 		echo "INFO: Running Terraform for the Lightsail instance..."; \
 		(cd samsara/terraform/kshitiz && terraform init -upgrade \
 			-backend-config="access_key=$$R2_ACCESS_KEY" \
@@ -567,9 +573,30 @@ kubeconfig:
 pralaya:
 	@echo "🔥  Invoking Pralaya (Dissolution)..."
 	@echo "WARNING: This will destroy all infrastructure managed by this project."
+	@echo "INFO: The Kshitiz Static IP will NOT be deleted and remains persisted in AWS."
 	@read -p "Are you sure you want to proceed? [y/N] " confirm && [[ $$confirm == [yY] || $$confirm == [yY][eE][sS] ]] || exit 1
 	@echo "INFO: Destroying Vyom (Compute Layer)..."
 	#(cd samsara/terraform/vyom && terraform destroy -auto-approve)
 	@echo "INFO: Destroying Kshitiz (Edge Layer)..."
 	#(cd samsara/terraform/kshitiz && terraform destroy -auto-approve)
 	@echo "SUCCESS: Pralaya is complete. The universe has returned to the void."
+
+pralaya-achala:
+	@echo "🔥  Destroying Achala (Persistent Infrastructure)..."
+	@echo "WARNING: This will destroy the Static IP (Kshitiz Anchor)!"
+	@/bin/bash -c ' \
+		set -e; \
+		echo "INFO: Fetching R2 Backend Credentials..."; \
+		R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
+		R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
+		R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
+		(cd samsara/terraform/persistence && terraform init -upgrade \
+			-backend-config="access_key=$$R2_ACCESS_KEY" \
+			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
+			-backend-config="endpoint=$$R2_ENDPOINT" \
+			&& terraform destroy -auto-approve); \
+	'
+	@echo "Achala (Persistent infrastructure) destroyed."
+
+maha-pralaya: pralaya pralaya-achala
+	@echo "💥  Maha-Pralaya Complete. The Void reigns."

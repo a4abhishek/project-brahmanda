@@ -103,16 +103,50 @@ resource "aws_lightsail_instance" "kshitiz" {
     Layer       = "Kshitiz"
     ManagedBy   = "Terraform"
   }
+
+  lifecycle {
+    # Force recreation if the SSH key changes
+    replace_triggered_by = [aws_lightsail_key_pair.kshitiz_key]
+  }
 }
 
-# 2. Static IP for Lighthouse
-resource "aws_lightsail_static_ip" "kshitiz" {
-  name = "kshitiz-static-ip"
+data "onepassword_item" "r2_credentials" {
+  vault = "Project-Brahmanda"
+  title = "Cloudflare-Sanchay-Token"
+}
+
+locals {
+  # Extract R2 credentials
+  r2_fields = flatten([
+    for s in data.onepassword_item.r2_credentials.section : s.field
+  ])
+  r2_access_key = one([for f in local.r2_fields : f.value if f.label == "R2_ACCESS_KEY_ID"])
+  r2_secret_key = one([for f in local.r2_fields : f.value if f.label == "R2_SECRET_ACCESS_KEY"])
+  r2_endpoint   = one([for f in local.r2_fields : f.value if f.label == "R2_ENDPOINT"])
+}
+
+# 2. Static IP for Lighthouse (From Remote State)
+data "terraform_remote_state" "persistence" {
+  backend = "s3"
+  config = {
+    bucket                      = "brahmanda-state"
+    key                         = "persistence/terraform.tfstate"
+    region                      = "auto"
+    skip_credentials_validation = true
+    skip_region_validation      = true
+    skip_requesting_account_id  = true
+    skip_metadata_api_check     = true
+    skip_s3_checksum            = true
+    use_path_style              = true
+    endpoint                    = local.r2_endpoint
+    access_key                  = local.r2_access_key
+    secret_key                  = local.r2_secret_key
+  }
 }
 
 # Attach static IP to instance
 resource "aws_lightsail_static_ip_attachment" "kshitiz_attach" {
-  static_ip_name = aws_lightsail_static_ip.kshitiz.name
+  static_ip_name = data.terraform_remote_state.persistence.outputs.static_ip_name
   instance_name  = aws_lightsail_instance.kshitiz.name
 
   lifecycle {
