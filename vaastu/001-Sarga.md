@@ -463,6 +463,35 @@ Generate Cloudflare credentials for Terraform state and DNS management:
 
   > **💡 NOTE:** The `R2_ENDPOINT` field is stored as configuration for IaC tools. While it can be generated programmatically from the Account ID, storing it explicitly in 1Password is common practice—it makes Terraform/Ansible configurations more readable and reduces string interpolation errors.
 
+### Hostinger API Token (DNS)
+
+Generate the API Token to allow Terraform to manage DNS records for `abhishek-kashyap.com` automatically.
+
+**1. Generate Token:**
+
+1. Log in to [Hostinger hPanel](https://hpanel.hostinger.com/profile/api). Click on the **User Icon** (Top Right) -> **Account Information** -> **API Access** then click **Generate Token**.
+    <br><img src="../.github/assets/sarga/hostinger-token-01-click-generate.png" alt="Hostinger Generate Token" width="600">
+2. Fill in details:
+    - **Name:** `Hostinger-Parichay-Token`
+    - **Expiration:** `Never expires`
+3. Click **Generate**.
+    <br><img src="../.github/assets/sarga/hostinger-token-02-fill-details.png" alt="Hostinger Fill-in Details" width="600">
+4. Copy the generated token immediately (it is shown only once). Save in 1Password before closing or reloading the page.
+    <br><img src="../.github/assets/sarga/hostinger-token-03-copy-token-before-closing.png" alt="Hostinger Copy Token Before Closing" width="600">
+
+**2. Store in 1Password:**
+
+1. Open 1Password -> **"Project-Brahmanda"** vault and click **New Item**.
+2. Create a new **Password** item.
+    <br><img src="../.github/assets/sarga/hostinger-token-04-create-1Password-item.png" alt="Hostinger Create 1Password Item" width="600">
+3. Fill in details:
+   - **Title:** `Hostinger-Parichay-Token`
+   - **password:** Paste the token
+4. Save the item.
+    <br><img src="../.github/assets/sarga/hostinger-token-05-fill-1Password-details-and-save.png" alt="Hostinger Fill-in 1Password Details and Save" width="600">
+
+Now close the Hostinger page or reload to hide the token.
+
 ### Upstash Lease
 
 This will be used by our IaC tooling (Terraform/Ansible) to acquire a lease-based lock for synchronizing infrastructure provisioning, protecting both the underlying Infrastructure layer and the Terraform state.

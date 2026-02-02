@@ -1,32 +1,6 @@
 # Persistent Infrastructure
 # This module contains resources that should NEVER be destroyed during regular cycles.
 
-terraform {
-  required_version = ">= 1.9.0"
-
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
-    onepassword = {
-      source = "1Password/onepassword"
-    }
-  }
-
-  backend "s3" {
-    bucket                      = "brahmanda-state"
-    key                         = "persistence/terraform.tfstate"
-    region                      = "auto"
-    skip_credentials_validation = true
-    skip_region_validation      = true
-    skip_requesting_account_id  = true
-    skip_metadata_api_check     = true
-    skip_s3_checksum            = true
-    use_path_style              = true
-  }
-}
-
 # 1Password Provider Configuration
 provider "onepassword" {
 }
@@ -36,15 +10,22 @@ data "onepassword_item" "aws_credentials" {
   title = "AWS-samsara-iac"
 }
 
+data "onepassword_item" "hostinger_credentials" {
+  vault = "Project-Brahmanda"
+  title = "Hostinger-Parichay-Token"
+}
+
 locals {
   aws_creds_fields = flatten([
     for s in data.onepassword_item.aws_credentials.section : s.field
     if s.label == "Security Credentials"
   ])
+  
+  hostinger_api_token = data.onepassword_item.hostinger_credentials.password
 }
 
 provider "aws" {
-  region     = "ap-southeast-1" # Singapore
+  region     = var.aws_region
   access_key = one([for f in local.aws_creds_fields : f.value if f.label == "AWS_ACCESS_KEY_ID"])
   secret_key = one([for f in local.aws_creds_fields : f.value if f.label == "AWS_SECRET_ACCESS_KEY"])
   
@@ -57,14 +38,28 @@ provider "aws" {
   }
 }
 
+provider "hostinger" {
+  api_token = local.hostinger_api_token
+}
+
 resource "aws_lightsail_static_ip" "kshitiz" {
   name = "kshitiz-static-ip"
 }
 
-output "static_ip" {
+# --- DNS Configuration (Achala) ---
+
+resource "hostinger_dns_record" "root_a" {
+  zone  = var.domain_name
+  name  = "@"
+  type  = "A"
   value = aws_lightsail_static_ip.kshitiz.ip_address
+  ttl   = 14400
 }
 
-output "static_ip_name" {
-  value = aws_lightsail_static_ip.kshitiz.name
+resource "hostinger_dns_record" "vyom_wildcard" {
+  zone  = var.domain_name
+  name  = "*.vyom"
+  type  = "A"
+  value = aws_lightsail_static_ip.kshitiz.ip_address
+  ttl   = 14400
 }
