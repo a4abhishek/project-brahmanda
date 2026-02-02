@@ -23,7 +23,7 @@
         - { regexp: 'PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
         - { regexp: 'PasswordAuthentication', line: 'PasswordAuthentication no' }
         - { regexp: 'KbdInteractiveAuthentication', line: 'KbdInteractiveAuthentication no' }
-        - { regexp: 'UsePAM', line: 'UsePAM no' }
+        - { regexp: 'UsePAM', line: 'UsePAM yes' }
         - { regexp: 'PermitRootLogin', line: 'PermitRootLogin no' }
         - { regexp: 'X11Forwarding', line: 'X11Forwarding no' }
         - { regexp: 'AllowAgentForwarding', line: 'AllowAgentForwarding no' }
