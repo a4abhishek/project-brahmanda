@@ -3,10 +3,13 @@
 **Date:** 2026-02-03
 **Status:** Accepted
 **Related RFC:** [RFC-013-Visarga.md](../manthana/RFC-013-Visarga.md)
+**Depends On:** [ADR-008-Ingress-And-DNS-Strategy.md](./ADR-008-Ingress-And-DNS-Strategy.md)
 
 ---
 ## Context
 How do we deploy, update, and manage applications on Project Brahmanda's Kubernetes cluster while maintaining security, automation, and the principles of Asanga Shastra (Weapon of Detachment)?
+
+> **Note:** This ADR focuses on application deployment (Visarga layer). For network ingress, DNS, and gateway architecture, see [ADR-008](./ADR-008-Ingress-And-DNS-Strategy.md).
 
 ## **Decision**
 

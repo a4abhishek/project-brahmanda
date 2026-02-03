@@ -1,7 +1,7 @@
 # **ADR-008: Ingress, DNS & The Gateway Strategy**
 
 **Date:** 2026-02-02<br>
-**Status:** Proposed<br>
+**Status:** Accepted<br>
 **Enhances:** [ADR-001-Homelab-Architecture.md](./ADR-001-Homelab-Architecture.md)<br>
 **Related Learning:** [Terraform-Persistent-State-Migration.md](../anvaya/terraform/Terraform-Persistent-State-Migration.md)
 
@@ -44,84 +44,183 @@ The DNS records are managed in the `samsara/terraform/persistence` module to ens
       ttl   = 14400
     }
 
-    resource "hostinger_dns_record" "vyom_wildcard" {
-      zone  = var.domain_name
-      name  = "*.vyom" # e.g., argocd.vyom.abhishek-kashyap.com
-      type  = "A"
-      value = aws_lightsail_static_ip.kshitiz.ip_address
-      ttl   = 14400
-    }
-    ```
+        resource "hostinger_dns_record" "brahmanda_wildcard" {
 
-### **B. The Gateway Configuration (Caddy on Kshitiz)**
+          zone  = var.domain_name
 
-Kshitiz runs **Caddy** as a systemd service. Caddy automatically manages SSL certificates for the domains it serves.
+          name  = "*.brahmanda" # e.g., argocd.brahmanda.abhishek-kashyap.com
 
-* **Installation:** Handled by Ansible (`01-bootstrap-kshitiz.yml`).
-* **Configuration (`Caddyfile`):**
+          type  = "A"
 
-    ```caddyfile
-    {
-        # Global Options
-        email avskksyp@gmail.com
-    }
+          value = aws_lightsail_static_ip.kshitiz.ip_address
 
-    # 1. Root Domain -> Personal Website (hosted in Vyom)
-    abhishek-kashyap.com {
-        reverse_proxy 10.42.1.201:80 # Vyom Ingress Service IP
-    }
+          ttl   = 14400
 
-    # 2. Wildcard Subdomains -> Vyom Traefik Ingress
-    *.vyom.abhishek-kashyap.com {
-        reverse_proxy 10.42.1.201:80
+        }
 
-        # TLS is terminated at Kshitiz.
-        # Traffic inside Nebula (10.42.x.x) is encrypted by Nebula itself.
-        # We forward to HTTP port of Traefik to avoid double encryption overhead/complexity.
-    }
-    ```
+    
 
-### **C. The Cluster Ingress (Traefik on Vyom)**
+        resource "hostinger_dns_record" "root_wildcard" {
 
-Inside the Vyom cluster, K3s ships with **Traefik** as the Ingress Controller.
+          zone  = var.domain_name
 
-* Traefik listens on the node's Nebula IP (e.g., `10.42.1.201`).
-* **IngressRoute CRD:**
+          name  = "*" # e.g., games.abhishek-kashyap.com
 
-    ```yaml
-    apiVersion: traefik.containo.us/v1alpha1
-    kind: IngressRoute
-    metadata:
-      name: argocd-server
-      namespace: argocd
-    spec:
-      entryPoints:
-        - web # Port 80
-      routes:
-        - match: Host(`argocd.vyom.abhishek-kashyap.com`)
-          kind: Rule
-          services:
-            - name: argocd-server
-              port: 80
-    ```
+          type  = "A"
 
-### **D. Traffic Flow (The Path of the Photon)**
+          value = aws_lightsail_static_ip.kshitiz.ip_address
 
-1. **User** visits `https://argocd.vyom.abhishek-kashyap.com`.
-2. **DNS** resolves to `18.140.145.253` (Kshitiz Static IP).
-3. **Kshitiz (Caddy)**:
-    * Receives request on port 443.
-    * Terminates SSL (Valid Let's Encrypt Cert).
-    * Matches `*.vyom...` pattern.
-    * Proxies to `10.42.1.201:80` (Vyom Node).
-4. **Nebula Mesh**:
-    * Encrypts packet.
-    * Routes through UDP hole-punch to Home Router.
-    * Delivers packet to Vyom Node.
-5. **Vyom (Traefik)**:
-    * Receives request on port 80.
-    * Matches `Host` header.
-    * Routes to `argocd-server` Pod.
+          ttl   = 14400
+
+        }
+
+        ```
+
+    
+
+    ### **B. The Gateway Configuration (Caddy on Kshitiz)**
+
+    
+
+    Kshitiz runs **Caddy** as a systemd service. Caddy automatically manages SSL certificates for the domains it serves.
+
+    
+
+    *   **Installation:** Handled by Ansible (`01-bootstrap-kshitiz.yml`).
+
+    *   **Configuration (`Caddyfile`):**
+
+        ```caddyfile
+
+        {
+
+            # Global Options
+
+            email avskksyp@gmail.com
+
+        }
+
+    
+
+        # 1. Root Domain -> Personal Website (hosted in Vyom)
+
+        abhishek-kashyap.com {
+
+            reverse_proxy 10.42.1.201:80 # Vyom Ingress Service IP
+
+        }
+
+    
+
+        # 2. Infrastructure Subdomains -> Vyom Traefik Ingress
+
+        *.brahmanda.abhishek-kashyap.com {
+
+            reverse_proxy 10.42.1.201:80
+
+            
+
+            # TLS is terminated at Kshitiz. 
+
+            # Traffic inside Nebula (10.42.x.x) is encrypted by Nebula itself.
+
+            # We forward to HTTP port of Traefik to avoid double encryption overhead/complexity.
+
+        }
+
+    
+
+        # 3. Vanity Subdomains (games, portfolio, etc.) -> Vyom Traefik Ingress
+
+        *.abhishek-kashyap.com {
+
+            reverse_proxy 10.42.1.201:80
+
+        }
+
+        ```
+
+    
+
+    ### **C. The Cluster Ingress (Traefik on Vyom)**
+
+    
+
+    Inside the Vyom cluster, K3s ships with **Traefik** as the Ingress Controller.
+
+    
+
+    *   Traefik listens on the node's Nebula IP (e.g., `10.42.1.201`).
+
+    *   **IngressRoute CRD:**
+
+        ```yaml
+
+        apiVersion: traefik.containo.us/v1alpha1
+
+        kind: IngressRoute
+
+        metadata:
+
+          name: argocd-server
+
+          namespace: argocd
+
+        spec:
+
+          entryPoints:
+
+            - web # Port 80
+
+          routes:
+
+            - match: Host(`argocd.brahmanda.abhishek-kashyap.com`)
+
+              kind: Rule
+
+              services:
+
+                - name: argocd-server
+
+                  port: 80
+
+        ```
+
+    
+
+    ### **D. Traffic Flow (The Path of the Photon)**
+
+    
+
+    1.  **User** visits `https://argocd.brahmanda.abhishek-kashyap.com`.
+
+    2.  **DNS** resolves to `18.140.145.253` (Kshitiz Static IP).
+
+    3.  **Kshitiz (Caddy)**:
+
+        *   Receives request on port 443.
+
+        *   Terminates SSL (Valid Let's Encrypt Cert).
+
+        *   Matches `*.brahmanda...` pattern.
+
+        *   Proxies to `10.42.1.201:80` (Vyom Node).
+
+    4.  **Nebula Mesh**:
+
+        *   Encrypts packet.
+
+        *   Routes through UDP hole-punch to Home Router.
+
+        *   Delivers packet to Vyom Node.
+
+    5.  **Vyom (Traefik)**:
+
+        *   Receives request on port 80.
+
+        *   Matches `Host` header.
+
+        *   Routes to `argocd-server` Pod.
 
 ## **4. Consequences**
 

@@ -56,9 +56,21 @@ resource "hostinger_dns_record" "root_a" {
   ttl   = 14400
 }
 
-resource "hostinger_dns_record" "vyom_wildcard" {
+# 1. Infrastructure Wildcard (*.brahmanda.domain.com)
+# Covers: argocd.brahmanda, k3s.brahmanda, etc.
+resource "hostinger_dns_record" "brahmanda_wildcard" {
   zone  = var.domain_name
-  name  = "*.vyom"
+  name  = "*.brahmanda"
+  type  = "A"
+  value = aws_lightsail_static_ip.kshitiz.ip_address
+  ttl   = 14400
+}
+
+# 2. Root Wildcard (*.domain.com)
+# Covers: games.domain.com, portfolio.domain.com, etc.
+resource "hostinger_dns_record" "root_wildcard" {
+  zone  = var.domain_name
+  name  = "*"
   type  = "A"
   value = aws_lightsail_static_ip.kshitiz.ip_address
   ttl   = 14400
