@@ -1,7 +1,10 @@
 # **RFC-013: Visarga (The Architecture of Population)**
 
-**Status:** Proposed<br>
-**Date:** 2026-02-02
+**Status:** Accepted<br>
+**Date:** 2026-02-02<br>
+**Decision:** See [ADR-009: Visarga Deployment Architecture](../vidhana/ADR-009-Visarga-Deployment-Architecture.md)
+
+> **Note:** This RFC contains the problem statement, alternatives analysis, and decision rationale. For complete implementation details, see [ADR-009](../vidhana/ADR-009-Visarga-Deployment-Architecture.md).
 
 ## **1. Context**
 
@@ -132,6 +135,7 @@ The hybrid approach (deploy JFrog → restore from R2 backup) sounds appealing b
 One of our core principles is **avoiding recurring costs**. The GHCR decision must be evaluated through this lens:
 
 **Phase 1: Start with GHCR Free Tier (Current)**
+
 * **Storage:** 500MB private packages
 * **Transfer:** 1GB/month egress
 * **Cost:** $0
@@ -241,6 +245,7 @@ flowchart TD
 ```
 
 **Current Recommendation:**
+
 * **Start with GHCR** (zero setup time, already in GitHub)
 * **Monitor usage quarterly** (simple `gh api` calls)
 * **Migrate to OCIR only if needed** (likely 1-2 years away)
@@ -342,6 +347,7 @@ helm pull oci://ghcr.io/a4abhishek/charts/greeter-ai --version 1.0.0
 ```
 
 **When to use R2:**
+
 * GitHub is down AND you need to deploy a NEW version (existing pods keep running)
 * Extremely unlikely scenario—deferred until we have >10 production services
 
@@ -446,6 +452,8 @@ sequenceDiagram
 3. **Supports semantic versioning** (latest patch, minor, major, or regex patterns)
 4. **Creates Git commits** (direct push) or **Pull Requests** (via GitHub API)
 
+**Implementation:** See [ADR-009: Visarga Deployment Architecture](../vidhana/ADR-009-Visarga-Deployment-Architecture.md) for complete installation, configuration, and workflow details.
+
 ```mermaid
 sequenceDiagram
     participant Dev as Developer
@@ -483,64 +491,7 @@ sequenceDiagram
     K3s->>K3s: Deploy application
 ```
 
-**Installation:**
-
-```bash
-# Deploy ArgoCD Image Updater to the cluster
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/stable/manifests/install.yaml
-
-# Configure GHCR credentials (reuse existing ghcr-private secret)
-kubectl create secret generic argocd-image-updater-secret \
-  --from-literal=registries.conf="
-registries:
-  - name: GitHub Container Registry
-    prefix: ghcr.io
-    api_url: https://ghcr.io
-    credentials: secret:argocd/ghcr-private#docker-password
-" -n argocd
-```
-
-**Configuration (Annotation-Based):**
-
-Add annotations to your ArgoCD Application:
-
-```yaml
-# sankalpa/apps/greeter-ai.yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: greeter-ai
-  namespace: argocd
-  annotations:
-    # Enable image updater for this app
-    argocd-image-updater.argoproj.io/image-list: greeter=ghcr.io/a4abhishek/greeter-ai
-
-    # Update strategy: semver (track minor versions, e.g., 1.x.x)
-    argocd-image-updater.argoproj.io/greeter.update-strategy: semver:~1.0
-
-    # Write-back method: Git commit (for automatic deployment)
-    argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/git-creds
-
-    # Alternative: Pull Request (for manual approval)
-    # argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/git-creds
-    # argocd-image-updater.argoproj.io/git-branch: image-updater-{{.AppName}}
-
-    # Helm parameter to update
-    argocd-image-updater.argoproj.io/greeter.helm.image-name: image.repository
-    argocd-image-updater.argoproj.io/greeter.helm.image-tag: image.tag
-spec:
-  source:
-    repoURL: ghcr.io/a4abhishek/charts
-    chart: greeter-ai
-    targetRevision: 1.0.0  # Will be auto-updated by Image Updater
-    helm:
-      parameters:
-        - name: image.repository
-          value: ghcr.io/a4abhishek/greeter-ai
-        - name: image.tag
-          value: v1.0.0  # Will be auto-updated
-  # ... rest of spec
-```
+**Implementation:** See [ADR-009: Visarga Deployment Architecture](../vidhana/ADR-009-Visarga-Deployment-Architecture.md) for complete installation, configuration, and annotation examples.
 
 **Update Strategies:**
 
@@ -553,87 +504,16 @@ spec:
 
 **Write-Back Methods:**
 
-**1. Direct Git Commit (Fully Automated):**
+| Method | Description | Use Case |
+| ------ | ----------- | -------- |
+| **Git Commit** | Direct commit to main branch | Dev/staging, fully automated |
+| **Pull Request** | Creates PR for human review | Production, security-conscious |
 
-```yaml
-annotations:
-  argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/git-creds
-  argocd-image-updater.argoproj.io/git-branch: main
-```
+**Implementation Details:** See [ADR-009: Visarga Deployment Architecture](../vidhana/ADR-009-Visarga-Deployment-Architecture.md) for complete configuration, credentials setup, and write-back workflows.
 
-- **Pro:** Zero manual intervention
-* **Con:** No human review before deployment
-* **Best for:** Dev/staging, or prod with comprehensive automated testing
+**Alternative: Renovate Bot**
 
-**2. Pull Request (Semi-Automated - RECOMMENDED):**
-
-```yaml
-annotations:
-  argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/git-creds
-  argocd-image-updater.argoproj.io/git-branch: image-updater-{{.AppName}}
-```
-
-- **Pro:** Human review before deployment (security, compliance)
-* **Con:** Requires manual PR merge
-* **Best for:** Production environments
-
-**Git Credentials Secret:**
-
-```bash
-# Create PAT with repo write access in 1Password
-# op://Project-Brahmanda/github-image-updater-token/credential
-
-kubectl create secret generic git-creds \
-  --from-literal=username=a4abhishek \
-  --from-literal=password=$(op read "op://Project-Brahmanda/github-image-updater-token/credential") \
-  -n argocd
-
-# Seal it for GitOps
-kubectl get secret git-creds -n argocd -o yaml | \
-  kubeseal --format yaml > sankalpa/core/sealed-git-creds.yaml
-```
-
-**Alternative: Renovate Bot (More Generic)**
-
-[Renovate](https://docs.renovatebot.com/) is a generic dependency updater that supports:
-* Helm charts (OCI and HTTP registries)
-* Docker images
-* npm, pip, go.mod, etc.
-
-**Pros:**
-* Unified dependency updates across all tech stacks
-* Extremely configurable (merge strategies, PR grouping, scheduling)
-* Free for GitHub
-
-**Cons:**
-* Runs as GitHub App (external to cluster) or self-hosted
-* More complex configuration than ArgoCD Image Updater
-* Requires `renovate.json` in each repo
-
-**Example Renovate Config:**
-
-```json
-// brahmanda-infra/.github/renovate.json
-{
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:base"],
-  "argocd": {
-    "fileMatch": ["sankalpa/apps/.*\\.yaml$"]
-  },
-  "helm-values": {
-    "fileMatch": ["sankalpa/apps/.*\\.yaml$"]
-  },
-  "regexManagers": [
-    {
-      "fileMatch": ["sankalpa/apps/.*\\.yaml$"],
-      "matchStrings": [
-        "targetRevision:\\s*(?<currentValue>.*?)\\n"
-      ],
-      "datasourceTemplate": "helm"
-    }
-  ]
-}
-```
+[Renovate](https://docs.renovatebot.com/) is a generic dependency updater supporting Helm charts, Docker images, and many other package types. More complex configuration than ArgoCD Image Updater but provides unified dependency updates across all tech stacks.
 
 **Decision Matrix:**
 
@@ -647,6 +527,7 @@ kubectl get secret git-creds -n argocd -o yaml | \
 
 **Phase 1 (Current):** Manual updates - simple, no additional tooling
 **Phase 2 (When >5 apps):** ArgoCD Image Updater with **Pull Request mode**
+
 * Honors *Aparigraha* (minimal complexity, native integration)
 * Maintains human oversight (review PRs before production deploy)
 * Automates toil without sacrificing control
@@ -689,136 +570,24 @@ brahmanda-maya/                   # Application Manifestations (NEW)
 ```
 
 **Benefits:**
+
 * ✅ **Clean infrastructure history:** `project-brahmanda` only tracks intentional infrastructure changes
-* ✅ **Focused app history:** `brahmanda-maya` shows clear application version progression
-* ✅ **Simpler rollbacks:** Revert app deployments without affecting infrastructure
-* ✅ **Separation of Concerns:** Infrastructure resides in `project-brahmanda`, applications reside in `brahmanda-maya`
-* ✅ **Faster CI:** App version bumps don't trigger infrastructure validation
-* ✅ **Reduced attack surface:** Private `brahmanda-maya` repo hides deployed applications from public view (security through obscurity as additional defense layer)
-* ✅ **Future scalability:** If collaborators join later, access control is easier to manage
+**Repository Separation Strategy (Recommended)**
 
-**Setup:**
+**The Problem:** Automated version bump commits pollute infrastructure repository history.
 
-**1. Create the maya repository:**
+**The Solution:** Separate `brahmanda-maya` repository for application manifests.
 
-```bash
-# Create new repository on GitHub (private to reduce attack surface)
-gh repo create a4abhishek/brahmanda-maya --private --description "Application manifestations for Project Brahmanda (Maya - the illusion projected from Git truth)"
+**Philosophy:** Infrastructure (Satya/truth) remains in `project-brahmanda`. Application deployments (Maya/illusion) are tracked separately in `brahmanda-maya`.
 
-# Clone and initialize
-git clone https://github.com/a4abhishek/brahmanda-maya.git
-cd brahmanda-maya
-mkdir -p apps
-```
+**Benefits:**
+* ✅ Clean infrastructure history
+* ✅ Focused application version tracking
+* ✅ Simpler rollbacks
+* ✅ Reduced attack surface (private maya repo)
+* ✅ Future scalability for collaboration
 
-**2. Move application manifests:**
-
-```bash
-# Move from project-brahmanda/sankalpa/apps/* to brahmanda-maya/apps/*
-mv ../project-brahmanda/sankalpa/apps/*.yaml apps/
-
-# Create README
-cat > README.md << 'EOF'
-# Brahmanda Maya (माया)
-
-> "The cluster is Maya (illusion/manifestation) - a temporary projection of the Git repository (Satya/truth). When the cluster is destroyed, the Maya vanishes, but the Satya remains."
-
-This repository contains ArgoCD Application manifests for Project Brahmanda workloads.
-
-## Philosophy
-**Maya:** The power of the Divine to manifest itself as the universe. In Advaita Vedanta, the world we see is Maya—a projection upon absolute truth (Brahman).
-
-**SRE Context:** Git is Satya (truth), the cluster is Maya (illusion). The running pods and services are temporary projections of the code. GitOps ensures we can recreate the Maya at will from the Satya.
-
-## Structure
-- `apps/` - ArgoCD Application CRDs for each service
-
-## Automated Updates
-ArgoCD Image Updater monitors GHCR for new versions and automatically creates PRs to update image tags.
-
-## Related Repositories
-- [project-brahmanda](https://github.com/a4abhishek/project-brahmanda) - Infrastructure & core systems (Satya)
-EOF
-
-git add .
-git commit -m "Initial commit: Application manifests"
-git push -u origin main
-```
-
-**3. Update project-brahmanda bootstrap:**
-
-```yaml
-# project-brahmanda/sankalpa/bootstrap.yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: brahmanda-maya
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: https://github.com/a4abhishek/brahmanda-maya.git
-    targetRevision: HEAD
-    path: apps
-    directory:
-      recurse: true
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: argocd
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-```
-
-**4. Configure Image Updater for the new repo:**
-
-```yaml
-# brahmanda-maya/apps/greeter-ai.yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: greeter-ai
-  namespace: argocd
-  annotations:
-    argocd-image-updater.argoproj.io/image-list: greeter=ghcr.io/a4abhishek/greeter-ai
-    argocd-image-updater.argoproj.io/greeter.update-strategy: semver:~1.0
-
-    # Write-back to brahmanda-maya repo (not project-brahmanda)
-    argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/git-creds
-    argocd-image-updater.argoproj.io/git-branch: image-updater-{{.AppName}}
-
-    # Helm parameter updates
-    argocd-image-updater.argoproj.io/greeter.helm.image-name: image.repository
-    argocd-image-updater.argoproj.io/greeter.helm.image-tag: image.tag
-spec:
-  source:
-    repoURL: ghcr.io/a4abhishek/charts
-    chart: greeter-ai
-    targetRevision: 1.0.0
-    helm:
-      parameters:
-        - name: image.repository
-          value: ghcr.io/a4abhishek/greeter-ai
-        - name: image.tag
-          value: v1.0.0
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: apps
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-```
-
-**5. Update Git credentials secret to include brahmanda-maya:**
-
-```bash
-# The same PAT works for both repos (if it has repo scope)
-# No changes needed if using existing git-creds secret
-```
+**Implementation:** See [ADR-009: Visarga Deployment Architecture](../vidhana/ADR-009-Visarga-Deployment-Architecture.md) for complete repository setup, ArgoCD bootstrap configuration, and workflow details.
 
 **Workflow After Separation:**
 
@@ -885,6 +654,7 @@ Create `brahmanda-maya` repository to separate concerns. This aligns with GitOps
 **🔒 Private Repository Consideration:**
 
 Keeping `brahmanda-maya` **private** provides defense-in-depth:
+
 * **Reduced attack surface:** Attackers must guess which applications are deployed vs. knowing from public repo
 * **Vulnerability disclosure control:** You control when/if to reveal application stack (critical when patching zero-days)
 * **Not primary security:** Still rely on proper authentication, network policies, and hardening as primary defenses
@@ -1025,393 +795,92 @@ spec:
    * ArgoCD deploys the `SealedSecret`.
    * Controller decrypts it into a real `Secret` in the cluster.
 
-3. **Key Management (Nidhi Framework):**
+3. **Key Management:** Sealed Secrets key stored in 1Password, deployed via Ansible (Nidhi framework).
 
-   **Initial Setup (One-time):**
-   ```bash
-   # Generate the sealed secret key
-   kubectl get secret -n kube-system sealed-secrets-key -o yaml > sealed-secrets-key.yaml
-   
-   # Store in 1Password (Admin-Project-Brahmanda vault)
-   op item create --category "Secure Note" \
-     --title "sealed-secrets-key" \
-     --vault "Admin-Project-Brahmanda" \
-     notesPlain="$(cat sealed-secrets-key.yaml)"
-   
-   # Clean up local copy
-   rm sealed-secrets-key.yaml
-   ```
-
-   **Deployment (Vyom Bootstrap Ansible Playbook):**
-   ```yaml
-   # samsara/ansible/playbooks/vyom-bootstrap.yml
-   - name: Deploy Sealed Secrets key from 1Password
-     kubernetes.core.k8s:
-       definition: "{{ lookup('onepassword', 'sealed-secrets-key', vault='Admin-Project-Brahmanda') }}"
-       state: present
-   ```
-
-   **Benefits:**
-   - ✅ Key survives cluster recreation (Asanga Shastra - Weapon of Detachment)
-   - ✅ Single source of truth (1Password as Satya)
-   - ✅ Automated deployment via Ansible (no manual kubectl apply)
-   - ✅ No key material in Git (Chakravyuh - defense in depth)
-
-**Alternative (Future):** External Secrets Operator to fetch secrets directly from 1Password at runtime.
+**Implementation:** See [ADR-009: Visarga Deployment Architecture](../vidhana/ADR-009-Visarga-Deployment-Architecture.md) for complete Sealed Secrets setup, key management, and 1Password integration.
 
 ### **E. Image Supply Chain Security**
 
-**Vulnerability Scanning:** Run Trivy in GitHub Actions:
+**Vulnerability Scanning:** Run Trivy in GitHub Actions to scan for CRITICAL/HIGH CVEs.
 
-```yaml
-# .github/workflows/build.yml
-- name: Run Trivy vulnerability scanner
-  uses: aquasecurity/trivy-action@master
-  with:
-    image-ref: 'ghcr.io/${{ github.repository }}:${{ github.sha }}'
-    format: 'sarif'
-    output: 'trivy-results.sarif'
-    severity: 'CRITICAL,HIGH'
-    exit-code: '1'  # Fail the build if critical vulns found
-```
+**Image Signing:** Use Cosign to sign container images with cryptographic signatures.
 
-**Image Signing:** Use Cosign to sign the image:
+**ArgoCD Verification:** Configure ArgoCD to verify signatures before deployment.
 
-```yaml
-- name: Sign the image
-  run: |
-    cosign sign --key env://COSIGN_KEY ghcr.io/${{ github.repository }}:${{ github.sha }}
-  env:
-    COSIGN_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-```
-
-**ArgoCD Verification:** Configure ArgoCD to reject unsigned images:
-
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: ArgoCD
-metadata:
-  name: argocd
-spec:
-  applicationSet:
-    verifySignature: true
-    cosignPublicKey: |
-      -----BEGIN PUBLIC KEY-----
-      ...
-      -----END PUBLIC KEY-----
-```
+**Implementation:** See [ADR-009: Visarga Deployment Architecture](../vidhana/ADR-009-Visarga-Deployment-Architecture.md) for complete security hardening procedures.
 
 ## **6. Operational Procedures (The Sanrakshan)**
 
-### **A. Rollback Strategy (Undoing Visarga)**
+### **A. Rollback Strategy**
 
-**Scenario:** A bad Helm chart version causes ArgoCD to fail sync.
+Manual rollback via `argocd app rollback`, or GitOps rollback by reverting commit in Git.
 
-**Manual Rollback:**
+### **B. Disaster Recovery**
 
-```bash
-# 1. Identify the failing application
-argocd app list
-argocd app get apps/greeter-ai
+1. Re-run Sarga + Samsara to rebuild cluster
+2. Deploy ArgoCD bootstrap (sealed-secrets-key auto-deployed from 1Password via Ansible)
+3. ArgoCD auto-syncs all applications from Git
+4. Restore Longhorn volumes from S3/R2 snapshots
 
-# 2. Check history
-argocd app history apps/greeter-ai
-
-# 3. Rollback to specific revision
-argocd app rollback apps/greeter-ai <revision-number>
-```
-
-**Automated Rollback:** Enable ArgoCD's automated sync with self-healing **disabled** for production:
-
-```yaml
-spec:
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: false  # Prevent automatic rollback; require manual approval
-    syncOptions:
-      - CreateNamespace=true
-```
-
-**GitOps Rollback:** Revert the commit in `sankalpa/` that changed the chart version.
-
-### **B. Disaster Recovery (Rebuilding After Pralaya)**
-
-**Scenario:** The cluster is destroyed. We need to restore all applications.
-
-**Prerequisites:**
-
-1. Sealed Secrets key stored in 1Password (Admin-Project-Brahmanda vault).
-2. Persistent volumes backed up to S3/R2 (Longhorn snapshots).
-
-**Recovery Steps:**
-
-```bash
-# 1. Re-run Sarga + Samsara to rebuild the cluster
-make srishti
-
-# 2. Vyom bootstrap Ansible playbook automatically deploys sealed-secrets-key from 1Password
-# (No manual kubectl commands needed - automated via Ansible)
-
-# 3. Deploy ArgoCD bootstrap
-kubectl apply -f sankalpa/bootstrap.yaml
-
-# 4. ArgoCD auto-syncs all applications from Git
-# 5. Restore Longhorn volumes from S3/R2 snapshots (manual process via Longhorn UI)
-```
-
-**RTO (Recovery Time Objective):** ~30 minutes (infrastructure) + data restore time.
+**RTO:** ~30 minutes + data restore time.
 
 ### **C. Monitoring & Alerting**
 
-**Key Metrics to Track:**
-
-1. **ArgoCD Sync Status:**
-   * Metric: `argocd_app_sync_status{name="greeter-ai"}`
-   * Alert: `sync_status != "Synced"` for > 5 minutes.
-
-2. **Image Pull Failures:**
-   * Metric: `kubelet_pull_image_errors_total`
-   * Alert: Spike indicates GHCR connectivity issue.
-
-3. **Certificate Expiry (Caddy):**
-   * Metric: `caddy_tls_cert_expiry_seconds`
-   * Alert: < 7 days remaining.
-
-4. **Nebula Connection Health:**
-   * Metric: `nebula_tunnel_connected{peer="kshitiz"}`
-   * Alert: Connection down for > 2 minutes.
-
-**Prometheus Rules:**
-
-```yaml
-# sankalpa/observability/prometheus/rules.yaml
-groups:
-  - name: visarga-alerts
-    rules:
-      - alert: ArgoCD Application Out of Sync
-        expr: argocd_app_sync_status != 1
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "ArgoCD app {{ $labels.name }} is out of sync"
-
-      - alert: CertificateExpiringSoon
-        expr: caddy_tls_cert_expiry_seconds < 604800  # 7 days
-        for: 1h
-        labels:
-          severity: critical
-        annotations:
-          summary: "TLS certificate for {{ $labels.domain }} expires in < 7 days"
-```
+Key metrics: ArgoCD sync status, image pull failures, certificate expiry, Nebula connectivity.
 
 ### **D. Debugging Failed Deployments**
 
-**Troubleshooting Workflow:**
+Common patterns: `ImagePullBackOff` (auth/rate limit), `CrashLoopBackOff` (app error), `Pending` (resources).
 
-```bash
-# 1. Check ArgoCD application status
-argocd app get apps/greeter-ai
-
-# 2. Check the events
-kubectl describe application greeter-ai -n argocd
-
-# 3. Check pod status in target namespace
-kubectl get pods -n apps
-kubectl describe pod greeter-ai-xxx -n apps
-
-# 4. Check image pull status
-kubectl get events -n apps --sort-by='.lastTimestamp' | grep -i image
-
-# 5. Verify GHCR connectivity from a debug pod
-kubectl run debug --rm -it --image=curlimages/curl -- sh
-# Inside pod:
-curl -v https://ghcr.io/v2/a4abhishek/greeter-ai/manifests/latest
-```
-
-**Common Issues:**
-
-| Symptom | Root Cause | Fix |
-|---------|-----------|-----|
-| `ImagePullBackOff` | GHCR rate limit / auth issue | Ensure ArgoCD has valid GHCR credentials (imagePullSecrets) |
-| `CrashLoopBackOff` | App startup failure | Check logs: `kubectl logs <pod>` |
-| `Pending` pod | Insufficient resources | Scale cluster or reduce resource requests |
-| ArgoCD stuck syncing | Invalid Helm chart | Check ArgoCD logs: `kubectl logs -n argocd deployment/argocd-repo-server` |
+**Implementation:** See [ADR-009: Visarga Deployment Architecture](../vidhana/ADR-009-Visarga-Deployment-Architecture.md) for complete operational procedures, monitoring setup, and troubleshooting workflows.
 
 ## **7. Scaling & Performance Considerations**
 
-### **A. Image Registry Caching (Avoiding GHCR Throttling)**
+### **A. Image Registry Caching**
 
-**Problem:** Pulling large images repeatedly from GHCR can hit rate limits.
-
-**Solution:** Deploy a pull-through cache using **Harbor** or **distribution/distribution** in the cluster.
-
-```yaml
-# sankalpa/core/registry-cache.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: registry-config
-  namespace: kube-system
-data:
-  config.yml: |
-    version: 0.1
-    proxy:
-      remoteurl: https://ghcr.io
-    storage:
-      filesystem:
-        rootdirectory: /var/lib/registry
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: registry-proxy
-  namespace: kube-system
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: registry-proxy
-  template:
-    spec:
-      containers:
-        - name: registry
-          image: registry:2
-          volumeMounts:
-            - name: config
-              mountPath: /etc/docker/registry
-            - name: storage
-              mountPath: /var/lib/registry
-      volumes:
-        - name: config
-          configMap:
-            name: registry-config
-        - name: storage
-          persistentVolumeClaim:
-            claimName: registry-cache-pvc
-```
-
-**Configuration:** Update K3s to use the local proxy:
-
-```bash
-# /etc/rancher/k3s/registries.yaml
-mirrors:
-  "ghcr.io":
-    endpoint:
-      - "http://registry-proxy.kube-system.svc.cluster.local:5000"
-```
+Deploy a pull-through cache using **distribution/distribution** in the cluster, configured as proxy for GHCR.
 
 ### **B. ArgoCD Performance Tuning**
 
-**For clusters with > 50 applications:**
+For clusters with > 50 applications: shard controller, scale repoServer horizontally.
 
-```yaml
-# sankalpa/core/argocd-values.yaml
-controller:
-  replicas: 3  # Shard the controller
-  env:
-    - name: ARGOCD_RECONCILIATION_TIMEOUT
-      value: "300s"
-    - name: ARGOCD_REPO_SERVER_TIMEOUT_SECONDS
-      value: "120"
+### **C. Resource Limits**
 
-repoServer:
-  replicas: 2  # Horizontal scaling for Helm template rendering
-  resources:
-    requests:
-      memory: "512Mi"
-      cpu: "500m"
-```
+Enforce LimitRanges per namespace to prevent noisy neighbors.
 
-### **C. Resource Limits (Preventing Noisy Neighbors)**
+### **D. Multi-Node Readiness (Future)**
 
-**Enforce LimitRanges per namespace:**
+When adding second NUC: pod anti-affinity, Longhorn 2-replica storage, MetalLB L2 load balancing.
 
-```yaml
-# sankalpa/core/resource-quotas.yaml
-apiVersion: v1
-kind: LimitRange
-metadata:
-  name: default-limits
-  namespace: apps
-spec:
-  limits:
-    - max:
-        cpu: "2"
-        memory: "4Gi"
-      min:
-        cpu: "100m"
-        memory: "128Mi"
-      default:
-        cpu: "500m"
-        memory: "512Mi"
-      defaultRequest:
-        cpu: "250m"
-        memory: "256Mi"
-      type: Container
-```
-
-### **D. Multi-Node Readiness (Future Expansion)**
-
-**When adding a second NUC:**
-
-1. **Pod Distribution:** Enable pod anti-affinity for critical services:
-
-   ```yaml
-   affinity:
-     podAntiAffinity:
-       requiredDuringSchedulingIgnoredDuringExecution:
-         - labelSelector:
-             matchLabels:
-               app: argocd-server
-           topologyKey: kubernetes.io/hostname
-   ```
-
-2. **Storage Replication:** Switch Longhorn from 1-replica to 2-replica StorageClass.
-
-3. **Load Balancing:** Use MetalLB for L2 load balancing across nodes (currently using single-node Service NodePort).
+**Implementation:** See [ADR-009: Visarga Deployment Architecture](../vidhana/ADR-009-Visarga-Deployment-Architecture.md) for complete performance tuning and scaling configurations.
 
 ## **8. Edge Cases & Failure Modes**
 
-### **A. GHCR Downtime (GitHub Outage)**
+### **A. GHCR Downtime**
 
-**Scenario:** GitHub is down. ArgoCD cannot pull charts. New pods cannot start.
+**Impact:** New pods cannot start (existing pods continue running due to image caching).
 
-**Mitigation:**
-
-1. **Image Caching:** K3s containerd retains pulled images. Existing pods continue running.
-2. **Helm Chart Mirroring:** Periodically sync GHCR charts to a secondary OCI registry (e.g., Quay.io):
-
-   ```bash
-   helm pull oci://ghcr.io/a4abhishek/charts/greeter-ai --version 1.0.0
-   helm push greeter-ai-1.0.0.tgz oci://quay.io/a4abhishek/charts
-   ```
-
-3. **Manual Deployment:** Use cached Helm tarballs stored in `brahmanda-infra/.cache/charts/`:
-
-   ```bash
-   kubectl apply -f <(helm template .cache/charts/greeter-ai-1.0.0.tgz)
-   ```
+**Mitigation:** Image caching (containerd), Helm chart mirroring to secondary OCI registry, cached tarball deployment.
 
 ### **B. ArgoCD Component Failure**
 
-**Scenario:** ArgoCD pod crashes.
+**Impact:** Existing apps continue running. New deployments blocked until recovery.
 
-**Impact:**
-* **Existing apps:** Continue running (ArgoCD is control plane, not data plane).
-* **New deployments:** Blocked until ArgoCD recovers.
+**HA Setup (Future):** 3 replicas of ArgoCD controller with Redis.
 
-**Recovery:**
+### **C. Nebula Mesh Partition**
 
-```bash
-# Check pod status
-kubectl get pods -n argocd
+Home ISP loses connectivity → External access blocked, internal services (LAN) continue, ArgoCD cannot pull from GHCR.
 
-# Force restart if stuck
-kubectl rollout restart deployment/argocd-server -n argocd
-kubectl rollout restart statefulset/argocd-application-controller -n argocd
-```
+**Mitigation:** LAN-local development (manual image push), auto-resume sync when internet returns.
+
+### **D. Sealed Secrets Key Loss**
+
+**CRITICAL:** All `SealedSecret` objects become unrecoverable.
+
+**Prevention:** Store key in 1Password (Admin-Project-Brahmanda vault) via Ansible automation.
+
+**Implementation:** See [ADR-009: Visarga Deployment Architecture](../vidhana/ADR-009-Visarga-Deployment-Architecture.md) for complete failure mode analysis and mitigation strategies.
 
 **HA Setup (Future):** Run 3 replicas of ArgoCD controller with Redis for HA state.
 
@@ -1420,6 +889,7 @@ kubectl rollout restart statefulset/argocd-application-controller -n argocd
 **Scenario:** Home ISP loses connectivity. Vyom cluster cannot reach Kshitiz.
 
 **Impact:**
+
 * **External Access:** Public users cannot reach services (expected).
 * **Internal Services:** Continue working on LAN (K8s East-West traffic unaffected).
 * **ArgoCD:** Cannot pull from GHCR (requires internet).
