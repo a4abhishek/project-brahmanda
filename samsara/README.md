@@ -161,6 +161,9 @@ make tirodhana
 # Decrypt vaults (Avirbhava - Manifestation)
 make avirbhava
 
+# Test vaults (Nikasha - Touchstone / Verification)
+make nikasha VAULT=kshitiz
+
 # Edit specific vault (Samshodhana - Editing)
 make samshodhana VAULT=kshitiz
 ```

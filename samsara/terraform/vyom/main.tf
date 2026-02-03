@@ -22,9 +22,9 @@ locals {
   upstash_token = one([for f in local.upstash_fields : f.value if f.label == "UPSTASH_REDIS_REST_TOKEN"])
 }
 
-# Fetch the current lock state from Upstash
+# Fetch the current lock state from Upstash (Master Lock)
 data "http" "lock_check" {
-  url = "${local.upstash_url}/GET/brahmanda_lock_vyom"
+  url = "${local.upstash_url}/GET/brahmanda_lock_srishti"
   request_headers = {
     Authorization = "Bearer ${local.upstash_token}"
   }

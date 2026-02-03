@@ -19,9 +19,9 @@
       setup:
 
   tasks:
-    - name: 🛡️ Verify Distributed Lock Ownership
+    - name: 🛡️ Verify Distributed Lock Ownership (Master Lock)
       ansible.builtin.uri:
-        url: "{{ upstash_url | trim }}/GET/brahmanda_lock_kshitiz"
+        url: "{{ upstash_url | trim }}/GET/brahmanda_lock_srishti"
         headers:
           Authorization: "Bearer {{ upstash_token | trim }}"
         return_content: true

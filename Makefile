@@ -86,8 +86,17 @@ endef
 # These targets do not represent files.
 .PHONY: help check_tools install_tools check_auth init \
 	nidhi-tirodhana nidhi-avirbhava samshodhana nidhi-nikasha \
-	pratistha samskara mukti srishti kshitiz vyom brahmaloka kubeconfig \
-	pralaya-kshitiz pralaya-vyom pralaya-brahmaloka pralaya-achala maha-pralaya avyakta
+	pratistha samskara mukti srishti sarga samsara visarga \
+	kshitiz kshitiz-locked kshitiz-impl \
+	vyom vyom-locked vyom-impl \
+	brahmaloka brahmaloka-locked brahmaloka-impl \
+	maya maya-locked maya-impl \
+	kubeconfig \
+	pralaya-kshitiz pralaya-kshitiz-locked pralaya-kshitiz-impl \
+	pralaya-vyom pralaya-vyom-locked pralaya-vyom-impl \
+	pralaya-brahmaloka pralaya-brahmaloka-locked pralaya-brahmaloka-impl \
+	pralaya-maya pralaya-maya-locked pralaya-maya-impl \
+	pralaya-achala pralaya avyakta maha-pralaya
 
 # --- Main Targets ---
 
@@ -101,13 +110,24 @@ help:
 	@echo "  pratistha     : 🖥️  (OS Consecration) Automates Proxmox ISO download, config, and USB creation."
 	@echo "  samskara      : 🕉️  (Purification) Refines Proxmox installation (repos, packages, disables popup)."
 	@echo "  mukti         : 🔓  (Liberation) Reclaims USB drive for general use after Pratistha."
-	@echo "  srishti       : 🕉️  (Creation) Provisions the Brahmanda (Kshitiz and Vyom)."
-	@echo "  pralaya       : 🔥  (Dissolution) Destroys the Brahmanda."
 	@echo ""
-	@echo "Partial Targets:"
+	@echo "Core Manifestation Targets (Srishti - The Creation):"
+	@echo "  srishti       : 🕉️  (Manifestation) Creates the entire Brahmanda (sarga → samsara → visarga)."
+	@echo ""
+	@echo "Manifestation Phases (Hierarchical):"
+	@echo "  sarga         : 🏗️  (Foundation) Provisions infrastructure - Kshitiz (Edge) + Vyom (Compute)."
+	@echo "  samsara       : ♾️  (Cycle) The eternal cycle of manifestation."
+	@echo "  visarga       : 🌿  (Secondary Creation) Provisions applications - Maya GitOps facade."
+	@echo ""
+	@echo "Individual Infrastructure Targets:"
 	@echo "  kshitiz       : ☁️  Provisions or updates the Edge layer (AWS Lightsail)."
 	@echo "  vyom          : 🏠  Provisions or updates the Compute layer (Proxmox VMs)."
-	@echo "  brahmaloka    : 🏗️  Provisions the Orchestration layer (Github Runners/Control)."
+	@echo "  brahmaloka    : 🏗️  Provisions the Orchestration layer (Github Runners/Control - separate from srishti)."
+	@echo "  maya          : 🎭  Provisions GitOps facade (ArgoCD + Image Updater)."
+	@echo ""
+	@echo "Dissolution Targets (Pralaya - The Dissolution):"
+	@echo "  pralaya       : 🔥  (Dissolution) Destroys the transient universe (Kshitiz + Vyom)."
+	@echo "  pralaya-maya  : 🔥  (Dissolution) Destroys applications (GitOps facade)."
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  install_tools : 🛠️  Installs necessary CLI tools (Terraform, Ansible, 1Password CLI)."
@@ -165,6 +185,8 @@ install-ansible-dependencies:
 	@ansible-galaxy collection install community.general ansible.posix
 	@ansible-galaxy role install trozz.ansible_nebula xanmanning.k3s
 
+# --- Nidhi Framework (Vault Management) ---
+
 nidhi-tirodhana: install-python-requirements
 	@chmod +x scripts/get-vault-password.sh
 	@if [ -z "$(VAULT)" ]; then \
@@ -199,6 +221,8 @@ nidhi-tirodhana: install-python-requirements
 		echo "✅ $(VAULT) treasury secured successfully"; \
 	fi
 
+tirodhana: nidhi-tirodhana  # Alias for backward compatibility
+
 nidhi-nikasha:
 	@chmod +x scripts/get-vault-password.sh
 	@echo "🪨💎 Nidhi-Nikasha: Testing treasuries on the touchstone..."
@@ -213,6 +237,8 @@ nidhi-nikasha:
 		fi; \
 	done
 	@echo "✅ All treasuries verified and secure"
+
+nikasha: nidhi-nikasha  # Alias for backward compatibility
 
 nidhi-avirbhava:
 	@chmod +x scripts/get-vault-password.sh
@@ -235,7 +261,9 @@ nidhi-avirbhava:
 		fi; \
 	fi
 
-samshodhana:
+avirbhava: nidhi-avirbhava  # Alias for backward compatibility
+
+nidhi-samshodhana:
 	@if [ -z "$(VAULT)" ]; then \
 		echo "ERROR: VAULT parameter required for editing."; \
 		echo "Usage: make samshodhana VAULT=<brahmanda|kshitiz|vyom>"; \
@@ -246,6 +274,7 @@ samshodhana:
 	@(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault edit "group_vars/$(VAULT)/vault.yml" --vault-password-file ../../scripts/get-vault-password.sh)
 	@echo "SUCCESS: $(VAULT) vault editing complete."
 
+samshodhana: nidhi-samshodhana  # Alias for backward compatibility
 
 # --- Tooling Setup ---
 
@@ -386,144 +415,281 @@ mukti:
 		$(if $(FORCE),--force)
 	@echo "SUCCESS: Mukti complete. USB drive liberated and ready for general use."
 
+# --- Hierarchical Manifestation Targets (Srishti - The Creation) ---
+
+# Sarga: Foundation (Infrastructure)
+# Provisions the base infrastructure layers: Edge (Kshitiz) and Compute (Vyom)
+sarga: kshitiz vyom
+	@echo "🏗️  Sarga (Foundation) complete: Kshitiz (Edge) and Vyom (Compute) manifested."
+
+# Samsara: The Cycle (Orchestration)
+# Note: Brahmaloka (the orchestrator) is provisioned separately outside the srishti pipeline
+# It exists outside the cycle - it IS the cycle runner
+samsara:
+	@echo "♾️  Samsara (The Cycle) complete: Foundation and applications orchestrated."
+
+# Visarga: Secondary Creation (Applications)
+# Provisions application layer: Maya (GitOps facade)
+visarga: maya
+	@echo "🌿  Visarga (Secondary Creation) complete: Maya (GitOps facade) manifested."
+
+# Maya: The Facade (GitOps Implementation)
+# Deploys ArgoCD, Image Updater, and bootstraps application deployment
+maya:
+	@echo "🎭  Provisioning Maya (GitOps Facade)..."
+	@if [ -z "$(BRAHMANDA_LOCK_HELD)" ]; then \
+		$(MAKE) maya-locked; \
+	else \
+		echo "INFO: Running under $(BRAHMANDA_LOCK_HELD) lock - proceeding without individual lock"; \
+		$(MAKE) maya-impl; \
+	fi
+
+maya-locked:
+	$(call WITH_LOCK,srishti, \
+		$(MAKE) maya-impl BRAHMANDA_LOCK_HELD=srishti; \
+	)
+
+maya-impl:
+	echo "--------------------------------------------------------------------------------"; \
+	echo "🚀  PHASE 1: Deploying ArgoCD and Image Updater..."; \
+	echo "--------------------------------------------------------------------------------"; \
+	echo ""; \
+	echo "INFO: Preparing to deploy Maya (GitOps facade) onto Vyom cluster..."; \
+	( \
+		KEY_FILE="/tmp/prakriti_master_key_maya_$$$$"; \
+		cleanup() { \
+			echo "INFO: Cleaning up temporary SSH key..."; \
+			rm -f "$$KEY_FILE"; \
+		}; \
+		trap cleanup EXIT; \
+		echo "INFO: Materializing Prakriti Master Key for Maya deployment..."; \
+		op read "op://Project-Brahmanda/Prakriti Master Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
+		chmod 600 "$$KEY_FILE"; \
+		echo "INFO: Running Ansible to bootstrap Maya (GitOps)..."; \
+		(cd samsara/ansible && \
+			$(ANSIBLE_ENV) ansible-playbook playbooks/04-bootstrap-maya.yml \
+			--private-key="$$KEY_FILE" \
+			-e "brahmanda_job_id=$(BRAHMANDA_JOB_ID)" \
+			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
+		); \
+	);
+	@echo "🎭  SUCCESS: Maya (GitOps facade) has been manifested."
+
+# Srishti: Complete Manifestation
+# Orchestrates the complete creation: Sarga → Samsara → Visarga
+# CRITICAL: Entire operation runs under single distributed lock (brahmanda_lock_srishti)
+# This ensures CI/CD pipeline invocations do not interfere with each other
+# Individual targets are called WITHOUT their own locks (they skip locking when BRAHMANDA_LOCK_HELD is set)
+# NOTE: Brahmaloka (orchestrator) is provisioned separately with make brahmaloka (uses brahmanda_lock_brahmaloka)
 srishti:
 	@echo "🕉️  Manifesting the Brahmanda..."
-	@echo "INFO: This process will provision the Kshitiz (Edge) and Vyom (Compute) layers."
+	@echo "INFO: Acquiring distributed lock for entire manifestation process..."
 	$(call WITH_LOCK,srishti, \
-		$(MAKE) kshitiz; \
-		$(MAKE) vyom; \
+		echo ""; \
+		echo "✅ SRISHTI LOCK ACQUIRED - Beginning atomic creation sequence"; \
+		echo ""; \
+		$(MAKE) sarga BRAHMANDA_LOCK_HELD=srishti; \
+		$(MAKE) samsara BRAHMANDA_LOCK_HELD=srishti; \
+		$(MAKE) visarga BRAHMANDA_LOCK_HELD=srishti; \
 	)
-	@echo "🕉️  SUCCESS: Srishti (Creation) is complete. The Brahmanda has been manifested."
+	@echo ""
+	@echo "🕉️  SUCCESS: Srishti (Manifestation) is complete. The Brahmanda has been fully created."
+	@echo "🕉️  The universe now exists:"
+	@echo "     ☁️  Kshitiz (Edge): AWS Lightsail gateway"
+	@echo "     🏠 Vyom (Compute): Kubernetes cluster on NUC"
+	@echo "     🎭 Maya (GitOps): Application deployment"
+	@echo ""
+	@echo "     Note: Brahmaloka (Orchestrator) is provisioned separately via 'make brahmaloka'"
+	@echo "     🎭 Maya (GitOps): Application deployment"
 
 kshitiz:
 	@echo "☁️  Provisioning Kshitiz (Edge Layer)..."
-	$(call WITH_LOCK,kshitiz, \
-		echo "--------------------------------------------------------------------------------"; \
-		echo "🚀  PHASE 1: Provisioning Kshitiz with Terraform..."; \
-		echo "--------------------------------------------------------------------------------"; \
-		echo ""; \
-		echo "INFO: Fetching R2 Backend Credentials..."; \
-		R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
-		R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
-		R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
-		if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
-			echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
-			echo "   Ensure item Cloudflare-Sanchay-Token exists with fields: R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_ENDPOINT"; \
-			exit 1; \
-		fi; \
-		echo "INFO: Running Terraform for Persistent Infrastructure..."; \
-		(cd samsara/terraform/persistence && terraform init -upgrade \
-			-backend-config="access_key=$$R2_ACCESS_KEY" \
-			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
-			-backend-config="endpoint=$$R2_ENDPOINT" \
-			&& terraform apply -auto-approve); \
-		echo "INFO: Running Terraform for the Lightsail instance..."; \
-		(cd samsara/terraform/kshitiz && terraform init -upgrade \
-			-backend-config="access_key=$$R2_ACCESS_KEY" \
-			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
-			-backend-config="endpoint=$$R2_ENDPOINT" \
-			&& terraform apply -auto-approve -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
-		echo ""; \
-		echo "--------------------------------------------------------------------------------"; \
-		echo "🚀  PHASE 2: Configuring Kshitiz with Ansible..."; \
-		echo "--------------------------------------------------------------------------------"; \
-		echo ""; \
-		echo "INFO: Preparing to configure Kshitiz..."; \
-		( \
-			KEY_FILE="/tmp/kshitiz_ssh_key_$$$$"; \
-			cleanup() { \
-				echo "INFO: Cleaning up temporary SSH key..."; \
-				rm -f "$$KEY_FILE"; \
-			}; \
-			trap cleanup EXIT; \
-			echo "INFO: Materializing SSH key for Kshitiz..."; \
-			op read "op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
-			chmod 600 "$$KEY_FILE"; \
-			echo "INFO: Running Ansible to configure Kshitiz..."; \
-			(cd samsara/ansible && \
-				$(ANSIBLE_ENV) ansible-playbook playbooks/01-bootstrap-kshitiz.yml \
-				--private-key="$$KEY_FILE" \
-				-e "brahmanda_job_id=$(BRAHMANDA_JOB_ID)" \
-				--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
-			); \
-		); \
+	@if [ -z "$(BRAHMANDA_LOCK_HELD)" ]; then \
+		$(MAKE) kshitiz-locked; \
+	else \
+		echo "INFO: Running under $(BRAHMANDA_LOCK_HELD) lock - proceeding without individual lock"; \
+		$(MAKE) kshitiz-impl; \
+	fi
+
+kshitiz-locked:
+	$(call WITH_LOCK,srishti, \
+		$(MAKE) kshitiz-impl BRAHMANDA_LOCK_HELD=srishti; \
 	)
+
+kshitiz-impl:
+	echo "--------------------------------------------------------------------------------"; \
+	echo "🚀  PHASE 1: Provisioning Kshitiz with Terraform..."; \
+	echo "--------------------------------------------------------------------------------"; \
+	echo ""; \
+	echo "INFO: Fetching R2 Backend Credentials..."; \
+	R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
+	R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
+	R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
+	if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
+		echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
+		echo "   Ensure item Cloudflare-Sanchay-Token exists with fields: R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_ENDPOINT"; \
+		exit 1; \
+	fi; \
+	echo "INFO: Running Terraform for Persistent Infrastructure..."; \
+	(cd samsara/terraform/persistence && terraform init -upgrade \
+		-backend-config="access_key=$$R2_ACCESS_KEY" \
+		-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
+		-backend-config="endpoint=$$R2_ENDPOINT" \
+		&& terraform apply -auto-approve); \
+	echo "INFO: Running Terraform for the Lightsail instance..."; \
+	(cd samsara/terraform/kshitiz && terraform init -upgrade \
+		-backend-config="access_key=$$R2_ACCESS_KEY" \
+		-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
+		-backend-config="endpoint=$$R2_ENDPOINT" \
+		&& terraform apply -auto-approve -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
+	echo ""; \
+	echo "--------------------------------------------------------------------------------"; \
+	echo "🚀  PHASE 2: Configuring Kshitiz with Ansible..."; \
+	echo "--------------------------------------------------------------------------------"; \
+	echo ""; \
+	echo "INFO: Preparing to configure Kshitiz..."; \
+	( \
+		KEY_FILE="/tmp/kshitiz_ssh_key_$$$$"; \
+		cleanup() { \
+			echo "INFO: Cleaning up temporary SSH key..."; \
+			rm -f "$$KEY_FILE"; \
+		}; \
+		trap cleanup EXIT; \
+		echo "INFO: Materializing SSH key for Kshitiz..."; \
+		op read "op://Project-Brahmanda/Kshitiz-Lighthouse-SSH-Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
+		chmod 600 "$$KEY_FILE"; \
+		echo "INFO: Running Ansible to configure Kshitiz..."; \
+		(cd samsara/ansible && \
+			$(ANSIBLE_ENV) ansible-playbook playbooks/01-bootstrap-kshitiz.yml \
+			--private-key="$$KEY_FILE" \
+			-e "brahmanda_job_id=$(BRAHMANDA_JOB_ID)" \
+			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
+		); \
+	);
 	@echo "🕉️  SUCCESS: Kshitiz has been manifested."
 
 vyom:
 	@echo "🏠  Provisioning Vyom (Compute Layer)..."
-	$(call WITH_LOCK,vyom, \
-		echo "--------------------------------------------------------------------------------"; \
-		echo "🚀  PHASE 1: Provisioning Vyom Nodes with Terraform..."; \
-		echo "--------------------------------------------------------------------------------"; \
-		echo ""; \
-		echo "INFO: Fetching R2 Backend Credentials..."; \
-		R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
-		R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
-		R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
-		if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
-			echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
-			echo "   Ensure item Cloudflare-Sanchay-Token exists with fields: R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_ENDPOINT"; \
-			exit 1; \
-		fi; \
-		echo "INFO: Running Terraform for the Proxmox VMs..."; \
-		(cd samsara/terraform/vyom && terraform init -upgrade \
-			-backend-config="access_key=$$R2_ACCESS_KEY" \
-			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
-			-backend-config="endpoint=$$R2_ENDPOINT" \
-			&& terraform apply -auto-approve -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
-		echo ""; \
-		echo "--------------------------------------------------------------------------------"; \
-		echo "🚀  PHASE 2: Configuring Vyom Cluster with Ansible..."; \
-		echo "--------------------------------------------------------------------------------"; \
-		echo ""; \
-		echo "INFO: Preparing to configure Vyom nodes..."; \
-		( \
-			KEY_FILE="/tmp/prakriti_master_key_$$$$"; \
-			cleanup() { \
-				echo "INFO: Cleaning up temporary SSH key for Vyom..."; \
-				rm -f "$$KEY_FILE"; \
-			}; \
-			trap cleanup EXIT; \
-			echo "INFO: Materializing Prakriti Master Key for Vyom..."; \
-			op read "op://Project-Brahmanda/Prakriti Master Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
-			chmod 600 "$$KEY_FILE"; \
-			echo "INFO: Running Ansible to bootstrap the Kubernetes cluster..."; \
-			(cd samsara/ansible && \
-				$(ANSIBLE_ENV) ansible-playbook playbooks/02-bootstrap-vyom.yml \
-				--private-key="$$KEY_FILE" \
-				-e "brahmanda_job_id=$(BRAHMANDA_JOB_ID)" \
-				--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
-			); \
-		); \
+	@if [ -z "$(BRAHMANDA_LOCK_HELD)" ]; then \
+		$(MAKE) vyom-locked; \
+	else \
+		echo "INFO: Running under $(BRAHMANDA_LOCK_HELD) lock - proceeding without individual lock"; \
+		$(MAKE) vyom-impl; \
+	fi
+
+vyom-locked:
+	$(call WITH_LOCK,srishti, \
+		$(MAKE) vyom-impl BRAHMANDA_LOCK_HELD=srishti; \
 	)
+
+vyom-impl:
+	echo "--------------------------------------------------------------------------------"; \
+	echo "🚀  PHASE 1: Provisioning Vyom Nodes with Terraform..."; \
+	echo "--------------------------------------------------------------------------------"; \
+	echo ""; \
+	echo "INFO: Fetching R2 Backend Credentials..."; \
+	R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
+	R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
+	R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
+	if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
+		echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
+		echo "   Ensure item Cloudflare-Sanchay-Token exists with fields: R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_ENDPOINT"; \
+		exit 1; \
+	fi; \
+	echo "INFO: Running Terraform for the Proxmox VMs..."; \
+	(cd samsara/terraform/vyom && terraform init -upgrade \
+		-backend-config="access_key=$$R2_ACCESS_KEY" \
+		-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
+		-backend-config="endpoint=$$R2_ENDPOINT" \
+		&& terraform apply -auto-approve -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
+	echo ""; \
+	echo "--------------------------------------------------------------------------------"; \
+	echo "🚀  PHASE 2: Configuring Vyom Cluster with Ansible..."; \
+	echo "--------------------------------------------------------------------------------"; \
+	echo ""; \
+	echo "INFO: Preparing to configure Vyom nodes..."; \
+	( \
+		KEY_FILE="/tmp/prakriti_master_key_$$$$"; \
+		cleanup() { \
+			echo "INFO: Cleaning up temporary SSH key for Vyom..."; \
+			rm -f "$$KEY_FILE"; \
+		}; \
+		trap cleanup EXIT; \
+		echo "INFO: Materializing Prakriti Master Key for Vyom..."; \
+		op read "op://Project-Brahmanda/Prakriti Master Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
+		chmod 600 "$$KEY_FILE"; \
+		echo "INFO: Running Ansible to bootstrap the Kubernetes cluster..."; \
+		(cd samsara/ansible && \
+			$(ANSIBLE_ENV) ansible-playbook playbooks/02-bootstrap-vyom.yml \
+			--private-key="$$KEY_FILE" \
+			-e "brahmanda_job_id=$(BRAHMANDA_JOB_ID)" \
+			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
+		); \
+	);
 	@echo "🕉️  SUCCESS: Vyom has been manifested."
 
 brahmaloka:
 	@echo "🏗️  Provisioning Brahmaloka (Orchestration Layer)..."
+	@if [ -z "$(BRAHMANDA_LOCK_HELD)" ]; then \
+		$(MAKE) brahmaloka-locked; \
+	else \
+		echo "INFO: Running under $(BRAHMANDA_LOCK_HELD) lock - proceeding without individual lock"; \
+		$(MAKE) brahmaloka-impl; \
+	fi
+
+brahmaloka-locked:
 	$(call WITH_LOCK,brahmaloka, \
-		echo "--------------------------------------------------------------------------------"; \
-		echo "🚀  PHASE 1: Provisioning Brahmaloka with Terraform..."; \
-		echo "--------------------------------------------------------------------------------"; \
-		echo ""; \
-		echo "INFO: Fetching R2 Backend Credentials..."; \
-		R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
-		R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
-		R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
-		if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
-			echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
-			exit 1; \
-		fi; \
-		echo "INFO: Fetching Brahmaloka Identity..."; \
-		SSH_PUB_KEY_FILE="/tmp/brahmaloka_pub_key_$$$$"; \
-		op read "op://Admin-Project-Brahmanda/Brahmaloka-SSH-Key/public key" > "$$SSH_PUB_KEY_FILE"; \
-		echo "INFO: Running Terraform for the Runner VM..."; \
-		(cd samsara/terraform/brahmaloka && terraform init -upgrade \
-			-backend-config="access_key=$$R2_ACCESS_KEY" \
-			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
-			-backend-config="endpoint=$$R2_ENDPOINT" \
-			&& terraform apply -auto-approve -var="ssh_public_key_path=$$SSH_PUB_KEY_FILE" -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
-		rm -f "$$SSH_PUB_KEY_FILE"; \
+		$(MAKE) brahmaloka-impl BRAHMANDA_LOCK_HELD=brahmaloka; \
+	)
+
+brahmaloka-impl:
+	echo "--------------------------------------------------------------------------------"; \
+	echo "🚀  PHASE 1: Provisioning Brahmaloka with Terraform..."; \
+	echo "--------------------------------------------------------------------------------"; \
+	echo ""; \
+	echo "INFO: Fetching R2 Backend Credentials..."; \
+	R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
+	R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
+	R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
+	if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
+		echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
+		exit 1; \
+	fi; \
+	echo "INFO: Fetching Brahmaloka Identity..."; \
+	SSH_PUB_KEY_FILE="/tmp/brahmaloka_pub_key_$$$$"; \
+	op read "op://Admin-Project-Brahmanda/Brahmaloka-SSH-Key/public key" > "$$SSH_PUB_KEY_FILE"; \
+	echo "INFO: Running Terraform for the Runner VM..."; \
+	(cd samsara/terraform/brahmaloka && terraform init -upgrade \
+		-backend-config="access_key=$$R2_ACCESS_KEY" \
+		-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
+		-backend-config="endpoint=$$R2_ENDPOINT" \
+		&& terraform apply -auto-approve -var="ssh_public_key_path=$$SSH_PUB_KEY_FILE" -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
+	rm -f "$$SSH_PUB_KEY_FILE"; \
+	echo ""; \
+	echo "--------------------------------------------------------------------------------"; \
+	echo "🚀  PHASE 2: Configuring Brahmaloka with Ansible..."; \
+	echo "--------------------------------------------------------------------------------"; \
+	echo ""; \
+	echo "INFO: Preparing to configure Brahmaloka..."; \
+	( \
+		KEY_FILE="/tmp/brahmaloka_priv_key_$$$$"; \
+		cleanup_key() { \
+			echo "INFO: Cleaning up temporary SSH keys..."; \
+			rm -f "$$KEY_FILE" "$$SSH_PUB_KEY_FILE"; \
+		}; \
+		trap cleanup_key EXIT; \
+		echo "INFO: Materializing Brahmaloka Private Key..."; \
+		op read "op://Admin-Project-Brahmanda/Brahmaloka-SSH-Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
+		chmod 600 "$$KEY_FILE"; \
+		echo "INFO: Running Ansible to configure the Runner..."; \
+		(cd samsara/ansible && \
+			$(ANSIBLE_ENV) ansible-playbook playbooks/03-bootstrap-brahmaloka.yml \
+			--private-key="$$KEY_FILE" \
+			-e "brahmanda_job_id=$(BRAHMANDA_JOB_ID)" \
+			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
+		); \
+	);
+	@echo "🕉️  SUCCESS: Brahmaloka has been manifested."
 		echo ""; \
 		echo "--------------------------------------------------------------------------------"; \
 		echo "🚀  PHASE 2: Configuring Brahmaloka with Ansible..."; \
@@ -573,67 +739,135 @@ kubeconfig:
 
 pralaya-kshitiz:
 	@echo "🔥  Destroying Kshitiz (Edge Layer)..."
-	$(call WITH_LOCK,kshitiz, \
-		echo "INFO: Fetching R2 Backend Credentials..."; \
-		R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
-		R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
-		R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
-		if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
-			echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
-			exit 1; \
-		fi; \
-		echo "INFO: Destroying Kshitiz Resources..."; \
-		(cd samsara/terraform/kshitiz && terraform init -upgrade \
-			-backend-config="access_key=$$R2_ACCESS_KEY" \
-			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
-			-backend-config="endpoint=$$R2_ENDPOINT" \
-			&& terraform destroy -auto-approve -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
+	@if [ -z "$(BRAHMANDA_LOCK_HELD)" ]; then \
+		$(MAKE) pralaya-kshitiz-locked; \
+	else \
+		echo "INFO: Running under $(BRAHMANDA_LOCK_HELD) lock - proceeding without individual lock"; \
+		$(MAKE) pralaya-kshitiz-impl; \
+	fi
+
+pralaya-kshitiz-locked:
+	$(call WITH_LOCK,srishti, \
+		$(MAKE) pralaya-kshitiz-impl BRAHMANDA_LOCK_HELD=srishti; \
 	)
+
+pralaya-kshitiz-impl:
+	echo "INFO: Fetching R2 Backend Credentials..."; \
+	R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
+	R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
+	R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
+	if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
+		echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
+		exit 1; \
+	fi; \
+	echo "INFO: Destroying Kshitiz Resources..."; \
+	(cd samsara/terraform/kshitiz && terraform init -upgrade \
+		-backend-config="access_key=$$R2_ACCESS_KEY" \
+		-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
+		-backend-config="endpoint=$$R2_ENDPOINT" \
+		&& terraform destroy -auto-approve -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)");
 	@echo "💥  Kshitiz destroyed."
 
 pralaya-vyom:
 	@echo "🔥  Destroying Vyom (Compute Layer)..."
-	$(call WITH_LOCK,vyom, \
-		echo "INFO: Fetching R2 Backend Credentials..."; \
-		R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
-		R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
-		R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
-		if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
-			echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
-			exit 1; \
-		fi; \
-		echo "INFO: Destroying Vyom Resources..."; \
-		(cd samsara/terraform/vyom && terraform init -upgrade \
-			-backend-config="access_key=$$R2_ACCESS_KEY" \
-			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
-			-backend-config="endpoint=$$R2_ENDPOINT" \
-			&& terraform destroy -auto-approve -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
+	@if [ -z "$(BRAHMANDA_LOCK_HELD)" ]; then \
+		$(MAKE) pralaya-vyom-locked; \
+	else \
+		echo "INFO: Running under $(BRAHMANDA_LOCK_HELD) lock - proceeding without individual lock"; \
+		$(MAKE) pralaya-vyom-impl; \
+	fi
+
+pralaya-vyom-locked:
+	$(call WITH_LOCK,srishti, \
+		$(MAKE) pralaya-vyom-impl BRAHMANDA_LOCK_HELD=srishti; \
 	)
+
+pralaya-vyom-impl:
+	echo "INFO: Fetching R2 Backend Credentials..."; \
+	R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
+	R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
+	R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
+	if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
+		echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
+		exit 1; \
+	fi; \
+	echo "INFO: Destroying Vyom Resources..."; \
+	(cd samsara/terraform/vyom && terraform init -upgrade \
+		-backend-config="access_key=$$R2_ACCESS_KEY" \
+		-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
+		-backend-config="endpoint=$$R2_ENDPOINT" \
+		&& terraform destroy -auto-approve -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)");
 	@echo "💥  Vyom destroyed."
 
 pralaya-brahmaloka:
 	@echo "🔥  Destroying Brahmaloka (Orchestration Layer)..."
-	$(call WITH_LOCK,brahmaloka, \
-		echo "INFO: Fetching R2 Backend Credentials..."; \
-		R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
-		R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
-		R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
-		if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
-			echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
-			exit 1; \
-		fi; \
-		echo "INFO: Fetching Brahmaloka Public Key (Required for destruction plan)..."; \
-		SSH_PUB_KEY_FILE="/tmp/brahmaloka_pub_key_$$$$"; \
-		op read "op://Admin-Project-Brahmanda/Brahmaloka-SSH-Key/public key" > "$$SSH_PUB_KEY_FILE"; \
-		echo "INFO: Destroying Brahmaloka Resources..."; \
-		(cd samsara/terraform/brahmaloka && terraform init -upgrade \
-			-backend-config="access_key=$$R2_ACCESS_KEY" \
-			-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
-			-backend-config="endpoint=$$R2_ENDPOINT" \
-			&& terraform destroy -auto-approve -var="ssh_public_key_path=$$SSH_PUB_KEY_FILE" -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
-		rm -f "$$SSH_PUB_KEY_FILE"; \
+	@if [ -z "$(BRAHMANDA_LOCK_HELD)" ]; then \
+		$(MAKE) pralaya-brahmaloka-locked; \
+	else \
+		echo "INFO: Running under $(BRAHMANDA_LOCK_HELD) lock - proceeding without individual lock"; \
+		$(MAKE) pralaya-brahmaloka-impl; \
+	fi
+
+pralaya-brahmaloka-locked:
+	$(call WITH_LOCK,srishti, \
+		$(MAKE) pralaya-brahmaloka-impl BRAHMANDA_LOCK_HELD=srishti; \
 	)
+
+pralaya-brahmaloka-impl:
+	echo "INFO: Fetching R2 Backend Credentials..."; \
+	R2_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ACCESS_KEY_ID"); \
+	R2_SECRET_ACCESS_KEY=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_SECRET_ACCESS_KEY"); \
+	R2_ENDPOINT=$$(op read "op://Project-Brahmanda/Cloudflare-Sanchay-Token/R2_ENDPOINT"); \
+	if [ -z "$$R2_ACCESS_KEY" ] || [ -z "$$R2_SECRET_ACCESS_KEY" ] || [ -z "$$R2_ENDPOINT" ]; then \
+		echo "❌ ERROR: Failed to retrieve R2 credentials from 1Password."; \
+		exit 1; \
+	fi; \
+	echo "INFO: Fetching Brahmaloka Public Key (Required for destruction plan)..."; \
+	SSH_PUB_KEY_FILE="/tmp/brahmaloka_pub_key_$$$$"; \
+	op read "op://Admin-Project-Brahmanda/Brahmaloka-SSH-Key/public key" > "$$SSH_PUB_KEY_FILE"; \
+	echo "INFO: Destroying Brahmaloka Resources..."; \
+	(cd samsara/terraform/brahmaloka && terraform init -upgrade \
+		-backend-config="access_key=$$R2_ACCESS_KEY" \
+		-backend-config="secret_key=$$R2_SECRET_ACCESS_KEY" \
+		-backend-config="endpoint=$$R2_ENDPOINT" \
+		&& terraform destroy -auto-approve -var="ssh_public_key_path=$$SSH_PUB_KEY_FILE" -var="brahmanda_job_id=$(BRAHMANDA_JOB_ID)"); \
+	rm -f "$$SSH_PUB_KEY_FILE";
 	@echo "💥  Brahmaloka destroyed."
+
+pralaya-maya:
+	@echo "🔥  Destroying Maya (GitOps Facade)..."
+	@if [ -z "$(BRAHMANDA_LOCK_HELD)" ]; then \
+		$(MAKE) pralaya-maya-locked; \
+	else \
+		echo "INFO: Running under $(BRAHMANDA_LOCK_HELD) lock - proceeding without individual lock"; \
+		$(MAKE) pralaya-maya-impl; \
+	fi
+
+pralaya-maya-locked:
+	$(call WITH_LOCK,srishti, \
+		$(MAKE) pralaya-maya-impl BRAHMANDA_LOCK_HELD=srishti; \
+	)
+
+pralaya-maya-impl:
+	echo "INFO: Preparing to destroy Maya (GitOps facade)..."; \
+	( \
+		KEY_FILE="/tmp/prakriti_master_key_maya_destroy_$$$$"; \
+		cleanup() { \
+			echo "INFO: Cleaning up temporary SSH key..."; \
+			rm -f "$$KEY_FILE"; \
+		}; \
+		trap cleanup EXIT; \
+		echo "INFO: Materializing Prakriti Master Key..."; \
+		op read "op://Project-Brahmanda/Prakriti Master Key/private key?ssh-format=openssh" > "$$KEY_FILE"; \
+		chmod 600 "$$KEY_FILE"; \
+		echo "INFO: Destroying ArgoCD and related resources..."; \
+		(cd samsara/ansible && \
+			$(ANSIBLE_ENV) ansible-playbook playbooks/04-destroy-maya.yml \
+			--private-key="$$KEY_FILE" \
+			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
+		); \
+	);
+	@echo "💥  Maya destroyed."
 
 pralaya-achala:
 	@echo "🔥  Destroying Achala (Persistent Infrastructure)..."

@@ -21,7 +21,7 @@
   # Phase 0: Validation & Connection
   # ---------------------------------------------------------------------------
   pre_tasks:
-    - name: 🛡️ Verify Distributed Lock Ownership
+    - name: 🛡️ Verify Distributed Lock Ownership (Brahmaloka Lock)
       ansible.builtin.uri:
         url: "{{ upstash_url | trim }}/GET/brahmanda_lock_brahmaloka"
         headers:

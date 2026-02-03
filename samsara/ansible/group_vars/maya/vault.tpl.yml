@@ -1,0 +1,17 @@
+---
+# Maya Ansible Vault Template
+# Generated from: make nidhi-tirodhana VAULT=maya
+# DO NOT EDIT vault.yml DIRECTLY - Edit this template and regenerate
+#
+# This template uses 1Password secret references (op://)
+# Run `make nidhi-tirodhana VAULT=maya` to generate the encrypted vault.yml
+
+# Maya (GitOps Facade) Ansible Vault Template
+github_username: "op://Project-Brahmanda/GitHub-ArgoCD-Image-Updater-PAT/username"
+github_argocd_image_updater_pat: "op://Project-Brahmanda/GitHub-ArgoCD-Image-Updater-PAT/password"
+ghcr_username: "op://Project-Brahmanda/GHCR-Pull-Credentials/username"
+ghcr_password: "op://Project-Brahmanda/GHCR-Pull-Credentials/password"
+argocd_admin_username: "op://Project-Brahmanda/ArgoCD-Admin-Password/username"
+argocd_admin_password: "op://Project-Brahmanda/ArgoCD-Admin-Password/password"
+upstash_url: "op://Project-Brahmanda/Upstash-Sanchay-Token/UPSTASH_REDIS_REST_URL"
+upstash_token: "op://Project-Brahmanda/Upstash-Sanchay-Token/UPSTASH_REDIS_REST_TOKEN"

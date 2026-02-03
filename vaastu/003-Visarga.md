@@ -42,18 +42,85 @@ You have manifested the physical universe through [Sarga](./001-Sarga.md). You h
 
 ---
 
+## 🏗️ Creating the Brahmanda-Sutra Repository
+
+The `brahmanda-sutra` repository is where your **ArgoCD Application manifests** (the sutras) live. This is the **Atman** — the eternal source of truth for what applications should exist in your cluster.
+
+### **Step 1: Create Repository**
+
+```bash
+gh repo create brahmanda-sutra --private --description="Concise eternal truths that manifest into running applications"
+cd ~/projects   # Your Project Root
+git clone git@github.com:a4abhishek/brahmanda-sutra.git
+cd brahmanda-sutra
+```
+
+### **Step 2: Create Portfolio Application Sutra**
+
+```bash
+mkdir -p apps
+
+cat > apps/portfolio.yaml <<'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: portfolio
+  namespace: argocd
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: portfolio=ghcr.io/a4abhishek/portfolio
+    argocd-image-updater.argoproj.io/portfolio.update-strategy: semver
+    argocd-image-updater.argoproj.io/portfolio.helm.image-name: image.repository
+    argocd-image-updater.argoproj.io/portfolio.helm.image-tag: image.tag
+    argocd-image-updater.argoproj.io/write-back-method: git
+spec:
+  project: default
+  source:
+    repoURL: oci://ghcr.io/a4abhishek
+    chart: portfolio
+    targetRevision: 1.0.0
+    helm:
+      releaseName: portfolio
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: apps
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+EOF
+```
+
+### **Step 3: Commit and Push**
+
+```bash
+git add .
+git commit -m "feat: Add portfolio application sutra"
+git push origin main
+```
+
+> **💡 NOTE:** The ArgoCD Application uses `repoURL: oci://ghcr.io/a4abhishek` (not `oci://ghcr.io/a4abhishek/portfolio`). This is because OCI Helm charts are stored at the **organization/user level** in GHCR, not repository level. The `chart: portfolio` field specifies which chart to pull.
+
+---
+
 ## 🔑 Prerequisites: The Keys to the Kingdom
 
 Before Maya (the GitOps facade) can manifest applications, you must acquire and store the necessary credentials. Think of these as the **divine keys** that unlock the gates between the mortal realm (your laptop) and the celestial machinery (GitHub, ArgoCD, GHCR).
 
 ### **1. GitHub Personal Access Token (PAT) — The Scribe's Quill**
 
-ArgoCD Image Updater needs **write access** to your `brahmanda-sutra` repository to automatically update image tags when new versions are published.
+ArgoCD Image Updater needs **write access** to `brahmanda-sutra` repository to automatically update image tags when new versions are published.
+
+> **📌 Token Type:** Use **Fine-grained Personal Access Token** (not Classic)
+> 
+> **Why?** Fine-grained tokens allow scoped access to specific repositories, following the principle of least privilege. This token only needs write access to `brahmanda-sutra`, not your entire GitHub account.
 
 **Create the PAT:**
 
-1. Navigate to [GitHub Settings → Developer Settings → Personal Access Tokens → Fine-grained tokens](https://github.com/settings/tokens?type=beta)
+1. Navigate to [GitHub Settings → Developer Settings → Personal Access Tokens → Fine-grained tokens](https://github.com/settings/personal-access-tokens)
 2. Click **Generate new token**
+  <br><img src="../.github/assets/visarga/githug-pat-argocd-image-updated-01-click-generate-token.png" alt="Go to Fine-grained Token and Click Generate Token" width=600>
 3. Configure:
    - **Token name:** `ArgoCD-Image-Updater-PAT`
    - **Expiration:** 1 year (or custom)
@@ -62,13 +129,17 @@ ArgoCD Image Updater needs **write access** to your `brahmanda-sutra` repository
      - Repository permissions → Contents: **Read and write**
      - Repository permissions → Metadata: **Read-only** (automatically selected)
 4. Click **Generate token**
-5. **Copy the token immediately** (you won't see it again)
+  <br><img src="../.github/assets/visarga/githug-pat-argocd-image-updated-02-fill-details-generate-token.png" alt="Go to Fine-grained Token and Click Generate Token" width=600>
+5. A confirmation window will pop-up, verify the details and click **Generate token**.
+  <br><img src="../.github/assets/visarga/githug-pat-argocd-image-updated-03-validate-chantes-and-confirm.png" alt="Validate Fine-grained Token details and Click Generate Token" width=600>
+6. **Copy the token immediately** (you won't see it again)
+  <br><img src="../.github/assets/visarga/githug-pat-argocd-image-updated-04-copy-pat.png" alt="Copy Fine-grained Token" width=600>
 
 **Store in 1Password:**
 
 ```bash
 # Ensure you're signed in to 1Password CLI
-op signin
+eval $(op signin)
 
 # Create the credential entry
 op item create \
@@ -77,10 +148,14 @@ op item create \
   --vault="Project-Brahmanda" \
   --tags="github,argocd,maya" \
   username=a4abhishek \
-  credential="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  password="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
+> You can use 1Password UI to save this credentail, just enter same details as above.
+
 ✅ **Verification:** `op read "op://Project-Brahmanda/GitHub-ArgoCD-Image-Updater-PAT/credential"` should return your PAT.
+
+Now you can close the PAT tab or reload to hide the token.
 
 ---
 
@@ -88,10 +163,15 @@ op item create \
 
 Your K3s cluster needs credentials to **pull private container images** from GitHub Container Registry (GHCR).
 
+> **📌 Token Type:** Use **Classic Personal Access Token** (not Fine-grained)
+> 
+> **Why?** As of 2026, Fine-grained tokens do not yet support GitHub Package Registry permissions. You must use a Classic token to access GHCR for pulling/pushing container images and Helm charts.
+
 **Create GHCR Token:**
 
 1. Navigate to [GitHub Settings → Developer Settings → Personal Access Tokens → Tokens (classic)](https://github.com/settings/tokens)
 2. Click **Generate new token (classic)**
+  <br><img src="../.github/assets/visarga/github-pat-ghcr-01-click-generate-token.png" alt="Go to Classic Token and click on Generate Token" width=600>
 3. Configure:
    - **Note:** `GHCR-Pull-Credentials`
    - **Expiration:** 1 year
@@ -99,7 +179,9 @@ Your K3s cluster needs credentials to **pull private container images** from Git
      - ✅ `read:packages` (Download packages from GitHub Package Registry)
      - ✅ `write:packages` (Upload packages to GitHub Package Registry)
 4. Click **Generate token**
+  <br><img src="../.github/assets/visarga/github-pat-ghcr-02-fill-details.png" alt="Fill in the details and click Generate Token" width=600>
 5. **Copy the token immediately**
+  <br><img src="../.github/assets/visarga/github-pat-ghcr-03-copy-token.png" alt="Copy the token" width=600>
 
 **Store in 1Password:**
 
@@ -348,7 +430,6 @@ name: Build and Publish
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
 
 env:
@@ -386,8 +467,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -427,75 +507,13 @@ git push origin v1.0.0
 
 ---
 
-## 🏗️ Creating the Brahmanda-Sutra Repository
-
-The `brahmanda-sutra` repository is where your **ArgoCD Application manifests** (the sutras) live. This is the **Atman** — the eternal source of truth for what applications should exist in your cluster.
-
-### **Step 1: Create Repository**
-
-```bash
-gh repo create brahmanda-sutra --private --description="Concise eternal truths that manifest into running applications"
-cd ~/projects
-git clone git@github.com:a4abhishek/brahmanda-sutra.git
-cd brahmanda-sutra
-```
-
-### **Step 2: Create Portfolio Application Sutra**
-
-```bash
-mkdir -p apps
-
-cat > apps/portfolio.yaml <<'EOF'
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: portfolio
-  namespace: argocd
-  annotations:
-    argocd-image-updater.argoproj.io/image-list: portfolio=ghcr.io/a4abhishek/portfolio
-    argocd-image-updater.argoproj.io/portfolio.update-strategy: semver
-    argocd-image-updater.argoproj.io/portfolio.helm.image-name: image.repository
-    argocd-image-updater.argoproj.io/portfolio.helm.image-tag: image.tag
-    argocd-image-updater.argoproj.io/write-back-method: git
-spec:
-  project: default
-  source:
-    repoURL: oci://ghcr.io/a4abhishek
-    chart: portfolio
-    targetRevision: 1.0.0
-    helm:
-      releaseName: portfolio
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: apps
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-EOF
-```
-
-### **Step 3: Commit and Push**
-
-```bash
-git add .
-git commit -m "feat: Add portfolio application sutra"
-git push origin main
-```
-
-> **💡 NOTE:** The ArgoCD Application uses `repoURL: oci://ghcr.io/a4abhishek` (not `oci://ghcr.io/a4abhishek/portfolio`). This is because OCI Helm charts are stored at the **organization/user level** in GHCR, not repository level. The `chart: portfolio` field specifies which chart to pull.
-
----
-
 ## 🔐 Generating Maya Vault
 
 The Maya Ansible playbook needs encrypted credentials stored in `group_vars/maya/vault.yml`. We use the **Nidhi framework** to generate this from 1Password.
 
 ### **Step 1: Verify Vault Template Exists**
 
-The vault template should already exist at `samsara/ansible/group_vars/maya/vault.tpl.yml` (created during Samsara setup). Verify:
+The vault template **should already exist** at [samsara/ansible/group_vars/maya/vault.tpl.yml](../samsara/ansible/group_vars/maya/vault.tpl.yml) (created during Samsara setup). Verify:
 
 ```bash
 cat samsara/ansible/group_vars/maya/vault.tpl.yml
@@ -507,7 +525,7 @@ Expected content:
 ---
 # Maya (GitOps Facade) Ansible Vault Template
 github_username: "op://Project-Brahmanda/GitHub-ArgoCD-Image-Updater-PAT/username"
-github_argocd_image_updater_pat: "op://Project-Brahmanda/GitHub-ArgoCD-Image-Updater-PAT/credential"
+github_argocd_image_updater_pat: "op://Project-Brahmanda/GitHub-ArgoCD-Image-Updater-PAT/password"
 ghcr_username: "op://Project-Brahmanda/GHCR-Pull-Credentials/username"
 ghcr_password: "op://Project-Brahmanda/GHCR-Pull-Credentials/password"
 argocd_admin_username: "op://Project-Brahmanda/ArgoCD-Admin-Password/username"
@@ -542,7 +560,7 @@ Before invoking Visarga, verify all prerequisites:
 
 ```bash
 # 1. Verify 1Password credentials exist
-op read "op://Project-Brahmanda/GitHub-ArgoCD-Image-Updater-PAT/credential" > /dev/null && echo "✅ GitHub PAT"
+op read "op://Project-Brahmanda/GitHub-ArgoCD-Image-Updater-PAT/password" > /dev/null && echo "✅ GitHub PAT"
 op read "op://Project-Brahmanda/GHCR-Pull-Credentials/password" > /dev/null && echo "✅ GHCR Token"
 op read "op://Project-Brahmanda/ArgoCD-Admin-Password/password" > /dev/null && echo "✅ ArgoCD Password"
 op read "op://Project-Brahmanda/Upstash-Sanchay-Token/UPSTASH_REDIS_REST_URL" > /dev/null && echo "✅ Upstash URL"
@@ -550,13 +568,17 @@ op read "op://Project-Brahmanda/Upstash-Sanchay-Token/UPSTASH_REDIS_REST_URL" > 
 # 2. Verify Maya vault exists
 make nidhi-tirodhana VAULT=maya
 
-# 3. Verify K3s cluster is operational
+# 3. Setup kubeconfig
+make kubeconfig
+export KUBECONFIG=~/.kube/config-vyom
+
+# 4. Verify K3s cluster is operational
 kubectl get nodes
 
-# 4. Verify portfolio image exists in GHCR
+# 5. Verify portfolio image exists in GHCR
 # Visit: https://github.com/a4abhishek/portfolio/pkgs/container/portfolio
 
-# 5. Verify brahmanda-sutra repository exists and has portfolio.yaml
+# 6. Verify brahmanda-sutra repository exists and has portfolio.yaml
 # Visit: https://github.com/a4abhishek/brahmanda-sutra
 ```
 
