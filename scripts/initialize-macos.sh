@@ -88,7 +88,7 @@ install_main_tools() {
   fi
   
   # Brew install is idempotent; it will only install if not already present
-  brew install ansible ansible-lint ansible-dev-tools 1password-cli jq xorriso
+  brew install ansible ansible-lint ansible-dev-tools 1password-cli kubectl jq xorriso
   success "Main tools installed"
 }
 

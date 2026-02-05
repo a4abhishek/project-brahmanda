@@ -1,44 +1,270 @@
 ---
-# Playbook: Bootstrap Maya (GitOps Facade)
-# Purpose: Deploy ArgoCD and Image Updater onto Vyom cluster
-# Status: STUB - To be implemented
+# -----------------------------------------------------------------------------
+# 🎭 Visarga: Maya (The GitOps Facade)
+# -----------------------------------------------------------------------------
+# This playbook deploys the GitOps machinery (ArgoCD + Image Updater) onto
+# the Vyom K3s cluster. Maya is the divine facade that interprets eternal
+# sutras (Application manifests) into temporary sharira (running pods).
+# -----------------------------------------------------------------------------
 
 - name: Bootstrap Maya (GitOps Facade)
   hosts: vyom_control_plane
   become: true
   gather_facts: true
 
-  vars:
-    maya_namespace: "argocd"
-    argocd_version: "v2.12.0"
+  # Load variables hierarchy
+  vars_files:
+    - ../group_vars/brahmanda/vault.yml
+    - ../group_vars/maya/vars.yml
+    - ../group_vars/maya/vault.yml
 
-  tasks:
-    - name: 🎭 Maya Bootstrap - Placeholder
-      ansible.builtin.debug:
-        msg: |
-          Maya (GitOps Facade) bootstrap is not yet implemented.
-          This is a placeholder playbook to allow CI pipeline to pass.
+  # ---------------------------------------------------------------------------
+  # Phase 0: Pre-Flight Validation
+  # ---------------------------------------------------------------------------
+  pre_tasks:
+    - name: 🛡️ Verify Distributed Lock Ownership (Master Lock)
+      ansible.builtin.uri:
+        url: "{{ upstash_url | trim }}/GET/brahmanda_lock_srishti"
+        headers:
+          Authorization: "Bearer {{ upstash_token | trim }}"
+        return_content: true
+      register: lock_status
+      failed_when: lock_status.json.result != (brahmanda_job_id | default('MANUAL_RUN'))
+      delegate_to: localhost
+      run_once: true
+      become: false
 
-          Planned implementation:
-            - Install ArgoCD on Vyom cluster
-            - Configure ArgoCD Image Updater
-            - Bootstrap application deployment from sankalpa/
-
-          Job ID: {{ brahmanda_job_id | default('local') }}
-
-    - name: Verify Kubernetes cluster is accessible
+    - name: 🔍 Verify K3s Cluster Accessibility
       ansible.builtin.command:
         cmd: kubectl cluster-info
       environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+        KUBECONFIG: "{{ kubeconfig_path }}"
       changed_when: false
-      failed_when: false
       register: k8s_check
 
-    - name: Display cluster status
+    - name: 🔍 Verify Traefik is Running
+      ansible.builtin.command:
+        cmd: kubectl get pods -n kube-system -l app.kubernetes.io/name=traefik
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+      register: traefik_check
+      failed_when: traefik_check.stdout_lines | length == 0
+
+    - name: ⚠️ Traefik Status
       ansible.builtin.debug:
-        msg: "Kubernetes cluster status: {{ 'accessible' if k8s_check.rc == 0 else 'not accessible' }}"
+        msg: "Traefik pods: {{ traefik_check.stdout_lines | length }} found"
+
+  # ---------------------------------------------------------------------------
+  # Phase 1: Install ArgoCD
+  # ---------------------------------------------------------------------------
+  tasks:
+    - name: � Install apache2-utils (for htpasswd)
+      ansible.builtin.apt:
+        name: apache2-utils
+        state: present
+        update_cache: true
+
+    - name: �📂 Create ArgoCD Namespace
+      ansible.builtin.shell: |
+        set -euo pipefail
+        kubectl create namespace {{ argocd_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+      args:
+        executable: /bin/bash
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+
+    - name: 📥 Download ArgoCD Installation Manifest
+      ansible.builtin.get_url:
+        url: "https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/install.yaml"
+        dest: "/tmp/argocd-install.yaml"
+        mode: '0644'
+
+    - name: ☸️ Install ArgoCD (Server-Side Apply for Large CRDs)
+      ansible.builtin.command:
+        cmd: kubectl apply --server-side --force-conflicts -n {{ argocd_namespace }} -f /tmp/argocd-install.yaml
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: argocd_install
+      changed_when: "'created' in argocd_install.stdout or 'configured' in argocd_install.stdout or 'serverside-applied' in argocd_install.stdout"
+
+    - name: 🔐 Create ArgoCD Redis Secret (v3.3.0 Requirement)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        # Generate Redis password and create secret
+        REDIS_PASSWORD=$(openssl rand -base64 32)
+        kubectl create secret generic argocd-redis \
+          --from-literal=auth="$REDIS_PASSWORD" \
+          --namespace={{ argocd_namespace }} \
+          --dry-run=client -o yaml | kubectl apply -f -
+      args:
+        executable: /bin/bash
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+
+    - name: ⏳ Wait for ArgoCD Server to be Ready
+      ansible.builtin.command:
+        cmd: kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n {{ argocd_namespace }}
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+
+    - name: 🔑 Update ArgoCD Admin Password
+      ansible.builtin.shell: |
+        set -euo pipefail
+        # Hash the password using bcrypt
+        PASSWORD_HASH=$(htpasswd -nbBC 10 "" "{{ argocd_admin_password | trim }}" | tr -d ':\n' | sed 's/$2y/$2a/')
+        
+        # Update the secret
+        kubectl -n {{ argocd_namespace }} patch secret argocd-secret \
+          -p "{\"stringData\": {\"admin.password\": \"$PASSWORD_HASH\", \"admin.passwordMtime\": \"$(date +%FT%T%Z)\"}}"
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      no_log: true
+      changed_when: true
+      args:
+        executable: /bin/bash
+
+    # -------------------------------------------------------------------------
+    # Phase 2: Install ArgoCD Image Updater
+    # -------------------------------------------------------------------------
+    - name: 📥 Download ArgoCD Image Updater Manifest
+      ansible.builtin.get_url:
+        url: "https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/refs/tags/{{ argocd_image_updater_version }}/config/install.yaml"
+        dest: "/tmp/argocd-image-updater-install.yaml"
+        mode: '0644'
+
+    - name: ☸️ Install ArgoCD Image Updater
+      ansible.builtin.command:
+        cmd: kubectl apply -n {{ argocd_namespace }} -f /tmp/argocd-image-updater-install.yaml
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: image_updater_install
+      changed_when: "'created' in image_updater_install.stdout or 'configured' in image_updater_install.stdout"
+
+    # -------------------------------------------------------------------------
+    # Phase 3: Configure Secrets
+    # -------------------------------------------------------------------------
+    - name: 🔐 Create GHCR Pull Secret
+      ansible.builtin.shell: |
+        set -euo pipefail
+        kubectl create secret docker-registry ghcr-secret \
+          --docker-server=ghcr.io \
+          --docker-username="{{ ghcr_username | trim }}" \
+          --docker-password="{{ ghcr_password | trim }}" \
+          --docker-email="{{ github_username | trim }}@users.noreply.github.com" \
+          --namespace={{ argocd_namespace }} \
+          --dry-run=client -o yaml | kubectl apply -f -
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      no_log: true
+      changed_when: false
+      args:
+        executable: /bin/bash
+
+    - name: 🔐 Create GitHub PAT Secret for Image Updater
+      ansible.builtin.shell: |
+        set -euo pipefail
+        kubectl create secret generic argocd-image-updater-secret \
+          --from-literal=git.token="{{ github_argocd_image_updater_pat | trim }}" \
+          --namespace={{ argocd_namespace }} \
+          --dry-run=client -o yaml | kubectl apply -f -
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      no_log: true
+      changed_when: false
+      args:
+        executable: /bin/bash
+
+    - name: 📝 Configure Image Updater Git Credentials
+      ansible.builtin.shell: |
+        set -euo pipefail
+        kubectl patch configmap argocd-image-updater-config \
+          -n {{ argocd_namespace }} \
+          --type merge \
+          -p '{"data":{"git.user":"{{ github_username | trim }}","git.email":"{{ github_username | trim }}@users.noreply.github.com"}}'
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: true
+      args:
+        executable: /bin/bash
+
+    # -------------------------------------------------------------------------
+    # Phase 4: Deploy Bootstrap Application
+    # -------------------------------------------------------------------------
+    - name: 📜 Create Bootstrap Application Manifest
+      ansible.builtin.template:
+        src: bootstrap-application.yaml.j2
+        dest: "/tmp/bootstrap-application.yaml"
+        mode: '0644'
+
+    - name: ☸️ Deploy Bootstrap Application
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/bootstrap-application.yaml
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: bootstrap_app
+      changed_when: "'created' in bootstrap_app.stdout or 'configured' in bootstrap_app.stdout"
+
+  # ---------------------------------------------------------------------------
+  # Phase 5: Post-Deployment Verification
+  # ---------------------------------------------------------------------------
+  post_tasks:
+    - name: ✅ Verify ArgoCD Pods
+      ansible.builtin.command:
+        cmd: kubectl get pods -n {{ argocd_namespace }} -l app.kubernetes.io/part-of=argocd
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+      register: argocd_pods
+
+    - name: 📊 ArgoCD Pod Status
+      ansible.builtin.debug:
+        msg: "{{ argocd_pods.stdout_lines }}"
+
+    - name: ✅ Verify Image Updater Pod
+      ansible.builtin.command:
+        cmd: kubectl get pods -n {{ argocd_namespace }} -l app.kubernetes.io/name=argocd-image-updater
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+      register: image_updater_pods
+
+    - name: 📊 Image Updater Pod Status
+      ansible.builtin.debug:
+        msg: "{{ image_updater_pods.stdout_lines }}"
+
+    - name: ✅ Verify Bootstrap Application
+      ansible.builtin.command:
+        cmd: kubectl get application brahmanda-sutra -n {{ argocd_namespace }}
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+      register: bootstrap_status
+
+    - name: 📊 Bootstrap Application Status
+      ansible.builtin.debug:
+        msg: "{{ bootstrap_status.stdout_lines }}"
 
     - name: 🎭 Maya Bootstrap Complete
       ansible.builtin.debug:
-        msg: "Maya bootstrap placeholder complete. No changes made."
+        msg: |
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          🎭 Maya (The GitOps Facade) is now active
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          
+          ArgoCD UI Access:
+            kubectl port-forward svc/argocd-server -n {{ argocd_namespace }} 8080:443
+            URL: https://localhost:8080
+            Username: admin
+            Password: (retrieve from 1Password: ArgoCD-Admin-Password)
+          
+          Next Steps:
+            1. Access ArgoCD UI to verify bootstrap application sync
+            2. Create your first application sutra in brahmanda-sutra repository
+            3. Watch as Maya manifests your application into reality
+          
+          "From the eternal sutras (code), Maya weaves the temporary sharira (pods)"
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

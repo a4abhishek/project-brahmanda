@@ -1,0 +1,26 @@
+---
+# Bootstrap Application - Monitors brahmanda-sutra repository for application manifests
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: brahmanda-sutra
+  namespace: {{ argocd_namespace }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ brahmanda_sutra_repo }}
+    targetRevision: HEAD
+    path: apps
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ argocd_namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

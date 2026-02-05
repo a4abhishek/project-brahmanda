@@ -289,6 +289,7 @@ check_tools:
 	fi
 	@$(if $(shell command -v ansible),,$(error "Ansible not found. Please run 'make install_tools' or install it manually."))
 	@$(if $(shell command -v op),,$(error "1Password CLI (op) not found. Please run 'make install_tools' or install it manually."))
+	@$(if $(shell command -v kubectl),,$(error "kubectl not found. Please run 'make install_tools' or install it manually."))
 	@$(if $(shell command -v proxmox-auto-install-assistant),,$(error "Proxmox Auto-Install Assistant not found. Please run 'make install_tools' or install it manually."))
 	@$(if $(shell command -v dasel),,$(error "dasel not found. Please run 'make install_tools' or install it manually."))
 	@$(if $(shell command -v mkfs.exfat),,$(error "exfatprogs not found. Please run 'make install_tools' or install it manually."))
@@ -456,6 +457,7 @@ maya-impl:
 	echo ""; \
 	echo "INFO: Preparing to deploy Maya (GitOps facade) onto Vyom cluster..."; \
 	( \
+		set -e; \
 		KEY_FILE="/tmp/prakriti_master_key_maya_$$$$"; \
 		cleanup() { \
 			echo "INFO: Cleaning up temporary SSH key..."; \
@@ -471,9 +473,8 @@ maya-impl:
 			--private-key="$$KEY_FILE" \
 			-e "brahmanda_job_id=$(BRAHMANDA_JOB_ID)" \
 			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
-		); \
+		) && echo "🎭  SUCCESS: Maya (GitOps facade) has been manifested."; \
 	);
-	@echo "🎭  SUCCESS: Maya (GitOps facade) has been manifested."
 
 # Srishti: Complete Manifestation
 # Orchestrates the complete creation: Sarga → Samsara → Visarga
@@ -549,6 +550,7 @@ kshitiz-impl:
 	echo ""; \
 	echo "INFO: Preparing to configure Kshitiz..."; \
 	( \
+		set -e; \
 		KEY_FILE="/tmp/kshitiz_ssh_key_$$$$"; \
 		cleanup() { \
 			echo "INFO: Cleaning up temporary SSH key..."; \
@@ -564,9 +566,8 @@ kshitiz-impl:
 			--private-key="$$KEY_FILE" \
 			-e "brahmanda_job_id=$(BRAHMANDA_JOB_ID)" \
 			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
-		); \
+		) && echo "🕉️  SUCCESS: Kshitiz has been manifested."; \
 	);
-	@echo "🕉️  SUCCESS: Kshitiz has been manifested."
 
 vyom:
 	@echo "🏠  Provisioning Vyom (Compute Layer)..."
@@ -609,6 +610,7 @@ vyom-impl:
 	echo ""; \
 	echo "INFO: Preparing to configure Vyom nodes..."; \
 	( \
+		set -e; \
 		KEY_FILE="/tmp/prakriti_master_key_$$$$"; \
 		cleanup() { \
 			echo "INFO: Cleaning up temporary SSH key for Vyom..."; \
@@ -624,9 +626,8 @@ vyom-impl:
 			--private-key="$$KEY_FILE" \
 			-e "brahmanda_job_id=$(BRAHMANDA_JOB_ID)" \
 			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
-		); \
-	);
-	@echo "🕉️  SUCCESS: Vyom has been manifested."
+		) && echo "🕉️  SUCCESS: Vyom has been manifested."; \
+	)
 
 brahmaloka:
 	@echo "🏗️  Provisioning Brahmaloka (Orchestration Layer)..."
@@ -672,6 +673,7 @@ brahmaloka-impl:
 	echo ""; \
 	echo "INFO: Preparing to configure Brahmaloka..."; \
 	( \
+		set -e; \
 		KEY_FILE="/tmp/brahmaloka_priv_key_$$$$"; \
 		cleanup_key() { \
 			echo "INFO: Cleaning up temporary SSH keys..."; \
@@ -687,9 +689,8 @@ brahmaloka-impl:
 			--private-key="$$KEY_FILE" \
 			-e "brahmanda_job_id=$(BRAHMANDA_JOB_ID)" \
 			--vault-password-file <(op read "op://Project-Brahmanda/Ansible Vault - Samsara/password") \
-		); \
+		) && echo "🕉️  SUCCESS: Brahmaloka has been manifested."; \
 	);
-	@echo "🕉️  SUCCESS: Brahmaloka has been manifested."
 		echo ""; \
 		echo "--------------------------------------------------------------------------------"; \
 		echo "🚀  PHASE 2: Configuring Brahmaloka with Ansible..."; \

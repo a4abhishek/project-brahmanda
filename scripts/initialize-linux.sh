@@ -197,6 +197,24 @@ install_main_tools() {
   success "Main tools installed"
 }
 
+# Install kubectl (Kubernetes CLI)
+install_kubectl() {
+  info "Installing kubectl..."
+  
+  if command_exists kubectl; then
+    info "kubectl already installed, skipping"
+    return 0
+  fi
+  
+  info "Downloading kubectl..."
+  local kubectl_version=$(curl -sL https://dl.k8s.io/release/stable.txt)
+  sudo curl -LO "https://dl.k8s.io/release/${kubectl_version}/bin/linux/amd64/kubectl"
+  sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+  sudo rm kubectl
+  
+  success "kubectl installed"
+}
+
 # Install filesystem tools for USB formatting
 install_filesystem_tools() {
   info "Installing filesystem tools (exfatprogs, ntfs-3g, dosfstools)..."
@@ -368,6 +386,7 @@ main() {
   install_ansible
   install_ansible_lint
   install_ansible_dev_tools
+  install_kubectl
   install_proxmox_assistant
   install_dasel
   install_filesystem_tools

@@ -84,7 +84,7 @@
     - name: 📜 Deploy Nebula Lighthouse configuration file
       # This creates the main config file for Nebula.
       ansible.builtin.template:
-        src: ../templates/nebula-lighthouse-config.yml.j2
+        src: nebula-lighthouse-config.yml.j2
         dest: /etc/nebula/config.yml
         owner: root
         group: root
