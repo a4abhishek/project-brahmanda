@@ -891,7 +891,9 @@ pralaya:
 	@echo "🔥  Invoking Pralaya (Dissolution)..."
 	@echo "WARNING: This will destroy the transient universe (Kshitiz & Vyom)."
 	@echo "INFO: Brahmaloka (Orchestrator) and Achala (Static IP) will be preserved."
-	@read -p "Are you sure you want to proceed? [y/N] " confirm && [[ $$confirm == [yY] || $$confirm == [yY][eE][sS] ]] || exit 1
+	@if [ "$(FORCE)" != "true" ] && [ "$(CI)" != "true" ]; then \
+		read -p "Are you sure you want to proceed? [y/N] " confirm && [[ $$confirm == [yY] || $$confirm == [yY][eE][sS] ]] || exit 1; \
+	fi
 	@$(MAKE) pralaya-vyom
 	@$(MAKE) pralaya-kshitiz
 	@echo "💥  Pralaya is complete. The universe has returned to the void."
