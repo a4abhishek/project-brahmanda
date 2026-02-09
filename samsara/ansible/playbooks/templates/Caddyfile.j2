@@ -1,0 +1,22 @@
+# Global Options
+{
+  email {{ acme_email }}
+}
+
+# Wildcard for infrastructure services
+*.brahmanda.{{ domain_name }} {
+  reverse_proxy https://10.42.1.0:443 {
+    transport http {
+      tls_insecure_skip_verify
+    }
+  }
+}
+
+# Root domain and wildcard for apps
+{{ domain_name }}, *.{{ domain_name }} {
+  reverse_proxy https://10.42.1.0:443 {
+    transport http {
+      tls_insecure_skip_verify
+    }
+  }
+}

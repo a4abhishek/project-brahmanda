@@ -14,3 +14,6 @@ lighthouse_ip: "10.42.0.1/16"
 
 # The external UDP port the lighthouse listens on.
 lighthouse_port: 4242
+
+# Domain configuration for reverse proxy
+domain_name: "abhishek-kashyap.com"

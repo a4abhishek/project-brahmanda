@@ -13,5 +13,8 @@ argocd_image_updater_version: "v1.1.0"  # First major release! (Released 2026-02
 # K3s Configuration
 kubeconfig_path: "/etc/rancher/k3s/k3s.yaml"
 
+# Domain Configuration
+domain_name: "abhishek-kashyap.com"
+
 # Brahmanda Sutra Repository (Application Manifests)
 brahmanda_sutra_repo: "https://github.com/a4abhishek/brahmanda-sutra.git"

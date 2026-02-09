@@ -127,6 +127,20 @@
       args:
         executable: /bin/bash
 
+    - name: 📜 Create ArgoCD Ingress Manifest (External Access)
+      ansible.builtin.template:
+        src: argocd-ingress.yaml.j2
+        dest: "/tmp/argocd-ingress.yaml"
+        mode: '0644'
+
+    - name: 🌐 Deploy ArgoCD Ingress
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/argocd-ingress.yaml
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: argocd_ingress
+      changed_when: "'created' in argocd_ingress.stdout or 'configured' in argocd_ingress.stdout"
+
     # -------------------------------------------------------------------------
     # Phase 2: Install ArgoCD Image Updater
     # -------------------------------------------------------------------------
@@ -256,10 +270,13 @@
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           
           ArgoCD UI Access:
-            kubectl port-forward svc/argocd-server -n {{ argocd_namespace }} 8080:443
-            URL: https://localhost:8080
+            External: https://argocd.brahmanda.{{ domain_name }}
+            Local:    kubectl port-forward svc/argocd-server -n {{ argocd_namespace }} 8080:443
             Username: admin
             Password: (retrieve from 1Password: ArgoCD-Admin-Password)
+          
+          Traffic Flow:
+            Internet → Kshitiz (Caddy) → Nebula Mesh → Traefik → ArgoCD
           
           Next Steps:
             1. Access ArgoCD UI to verify bootstrap application sync

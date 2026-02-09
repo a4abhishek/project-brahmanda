@@ -492,6 +492,30 @@ Generate the API Token to allow Terraform to manage DNS records for `abhishek-ka
 
 Now close the Hostinger page or reload to hide the token.
 
+### ACME Email (TLS Certificate Registration)
+
+When Caddy automatically provisions Let's Encrypt TLS certificates for the domain, it requires an email address for certificate expiration notifications and account recovery.
+
+**1. Create 1Password Identity:**
+
+1. Open 1Password → Navigate to **"Project-Brahmanda"** vault.
+2. Create a new **Identity** item:
+   - **Title:** `ACME-Email`
+   - **Internet Details → email:** Enter the email you want to use for Let's Encrypt notifications (e.g., your primary email or a dedicated admin email like `admin@abhishek-kashyap.com`)
+3. Save the item.
+
+**✅ Verification:**
+
+```bash
+op read "op://Project-Brahmanda/ACME-Email/Identification/email"
+```
+
+This should print your email address.
+
+💡 **TIP:** Use a reliable email address you actively monitor. Let's Encrypt sends expiration warnings 30/14/7 days before certificate expiry (though Caddy auto-renews well before expiration). This is also used for account recovery if you need to manually manage certificates.
+
+> **💡 NOTE:** While the ACME email has low security sensitivity (it's often publicly visible in certificate transparency logs), we store it in the encrypted vault for consistency with the "security-first" approach. All infrastructure configuration should be version-controlled and encrypted, regardless of sensitivity level.
+
 ### Upstash Lease
 
 This will be used by our IaC tooling (Terraform/Ansible) to acquire a lease-based lock for synchronizing infrastructure provisioning, protecting both the underlying Infrastructure layer and the Terraform state.

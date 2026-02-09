@@ -115,6 +115,85 @@
         state: started
         enabled: true
 
+    # -------------------------------------------------------------------------
+    # Phase 2: Reverse Proxy (Caddy)
+    # -------------------------------------------------------------------------
+    
+    # Create swap to prevent OOM on nano instance (512MB RAM)
+    - name: 🔄 Check if swap exists
+      ansible.builtin.stat:
+        path: /swapfile
+      register: swap_file
+
+    - name: 💾 Create swap file (1GB)
+      ansible.builtin.command: |
+        fallocate -l 1G /swapfile
+      when: not swap_file.stat.exists
+
+    - name: 🔒 Set swap file permissions
+      ansible.builtin.file:
+        path: /swapfile
+        mode: '0600'
+      when: not swap_file.stat.exists
+
+    - name: 💾 Format swap file
+      ansible.builtin.command: mkswap /swapfile
+      when: not swap_file.stat.exists
+
+    - name: ☑️ Enable swap
+      ansible.builtin.command: swapon /swapfile
+      when: not swap_file.stat.exists
+
+    - name: 📋 Add swap to fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: '/swapfile none swap sw 0 0'
+        state: present
+      when: not swap_file.stat.exists
+
+    - name: 📦 Install Caddy dependencies
+      ansible.builtin.apt:
+        name: 
+          - debian-keyring
+          - debian-archive-keyring
+          - apt-transport-https
+          - curl
+        state: present
+        update_cache: yes
+
+    - name: 🔑 Add Caddy GPG Key
+      ansible.builtin.shell: |
+        curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+
+    - name: 📋 Add Caddy Repository
+      ansible.builtin.shell: |
+        curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
+      args:
+        creates: /etc/apt/sources.list.d/caddy-stable.list
+
+    - name: 📦 Install Caddy Package
+      ansible.builtin.apt:
+        name: caddy
+        state: present
+        update_cache: yes
+
+    - name: 📜 Deploy Caddyfile
+      ansible.builtin.template:
+        src: Caddyfile.j2
+        dest: /etc/caddy/Caddyfile
+        owner: root
+        group: root
+        mode: '0644'
+      notify: 🔄️ Restart Caddy
+
+    - name: ☑️ Enable and start Caddy service
+      ansible.builtin.systemd:
+        name: caddy
+        state: started
+        enabled: true
+
   handlers:
     - import_tasks: ./handlers/main.yml
 
@@ -125,4 +204,9 @@
     - name: 🔄️ Restart Nebula
       ansible.builtin.systemd:
         name: nebula
+        state: restarted
+
+    - name: 🔄️ Restart Caddy
+      ansible.builtin.systemd:
+        name: caddy
         state: restarted
