@@ -116,7 +116,7 @@
         set -euo pipefail
         # Hash the password using bcrypt
         PASSWORD_HASH=$(htpasswd -nbBC 10 "" "{{ argocd_admin_password | trim }}" | tr -d ':\n' | sed 's/$2y/$2a/')
-        
+
         # Update the secret
         kubectl -n {{ argocd_namespace }} patch secret argocd-secret \
           -p "{\"stringData\": {\"admin.password\": \"$PASSWORD_HASH\", \"admin.passwordMtime\": \"$(date +%FT%T%Z)\"}}"
@@ -268,20 +268,20 @@
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           🎭 Maya (The GitOps Facade) is now active
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          
+
           ArgoCD UI Access:
             External: https://argocd.brahmanda.{{ domain_name }}
             Local:    kubectl port-forward svc/argocd-server -n {{ argocd_namespace }} 8080:443
             Username: admin
             Password: (retrieve from 1Password: ArgoCD-Admin-Password)
-          
+
           Traffic Flow:
             Internet → Kshitiz (Caddy) → Nebula Mesh → Traefik → ArgoCD
-          
+
           Next Steps:
             1. Access ArgoCD UI to verify bootstrap application sync
             2. Create your first application sutra in brahmanda-sutra repository
             3. Watch as Maya manifests your application into reality
-          
+
           "From the eternal sutras (code), Maya weaves the temporary sharira (pods)"
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

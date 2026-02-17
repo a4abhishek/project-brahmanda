@@ -675,34 +675,204 @@ The 1Password backup provides an additional recovery layer independent of Ansibl
 
 ### Vyom - Cluster Infrastructure
 
-The compute cluster requires a master SSH key for emergency access to all nodes.
+The compute cluster requires individual Nebula certificates for each node with specific IP assignments.
+
+#### **Nebula Mesh Networking**
+
+Nebula is a peer-to-peer overlay mesh VPN that securely connects AWS Lightsail (Kshitiz) to your home network (Vyom). It's used **exclusively for North-South traffic** (external→cluster); Kubernetes pod-to-pod communication uses local LAN for performance.
+
+**Network Topology:**
+
+```
+                      Internet
+                         │
+                         │ (External clients reach ArgoCD via this path)
+                         ▼
+      ┌──────────────────────────────────────────────┐
+      │  Kshitiz (AWS Lightsail - Edge Gateway)      │
+      │  ┌────────────────────────────────────────┐  │
+      │  │  Nebula IP: 10.42.0.1/16               │  │
+      │  │  Role: Lighthouse (coordinator)        │  │
+      │  │  Groups: kshitiz, lighthouse           │  │
+      │  │                                        │  │
+      │  │  Services:                             │  │
+      │  │  - Caddy (reverse proxy + TLS)         │  │
+      │  │  - Nebula (lighthouse node)            │  │
+      │  └────────────────────────────────────────┘  │
+      └──────────────────────────────────────────────┘
+                         │
+                         │ (Nebula mesh: 10.42.0.0/16)
+                         │
+          ┌──────────────┴──────────────┐
+          │                             │
+          ▼                             ▼
+┌─────────────────────┐       ┌─────────────────────┐
+│ Vyom Control Plane  │       │ Vyom Workers        │
+│ ┌─────────────────┐ │       │ ┌─────────────────┐ │
+│ │ Node: CP-1      │ │       │ │ Node: Worker-1  │ │
+│ │ VM ID: 210      │ │       │ │ VM ID: 211      │ │
+│ │ LAN: .210       │ │       │ │ LAN: .211       │ │
+│ │ Nebula: .210    │ │       │ │ Nebula: .211    │ │
+│ │ Groups: vyom,   │ │       │ │ Groups: vyom,   │ │
+│ │   control-plane │ │       │ │   worker        │ │
+│ └─────────────────┘ │       │ └─────────────────┘ │
+│                     │       │ ┌─────────────────┐ │
+│ K3s Control Plane   │       │ │ Node: Worker-2  │ │
+│ - etcd              │       │ │ VM ID: 212      │ │
+│ - API Server        │       │ │ LAN: .212       │ │
+│ - Scheduler         │       │ │ Nebula: .212    │ │
+│                     │       │ │ Groups: vyom,   │ │
+│                     │       │ │   worker        │ │
+│                     │       │ └─────────────────┘ │
+│                     │       │                     │
+│                     │       │ K3s Workers         │
+│                     │       │ - Container Runtime │
+│                     │       │ - Kubelet           │
+└─────────────────────┘       └─────────────────────┘
+          │                             │
+          │                             │
+          └──────────────┬──────────────┘
+                         │
+                  Local LAN (VLAN 30)
+                  192.168.68.0/24
+              (K8s East-West Traffic)
+```
+
+💡 **Key Point:** External traffic (Internet → ArgoCD) flows through Nebula. Internal Kubernetes traffic (pod-to-pod) uses local LAN (192.168.68.x) to avoid encryption overhead.
+
+<details>
+<summary>📚 Click to learn more about Nebula architecture and traffic flows</summary>
+
+**What is Nebula?**
+
+Nebula is a peer-to-peer overlay mesh VPN designed by Slack. Unlike traditional VPNs that route all traffic through a central server, Nebula creates direct, encrypted connections between nodes.
+
+**Why Nebula for Project Brahmanda?**
+
+1. **Hybrid Cloud Connectivity:** Connects AWS Lightsail (Kshitiz) to home network (Vyom) securely
+2. **End-to-End Encryption:** All mesh traffic encrypted with Noise Protocol Framework
+3. **Certificate-Based Authentication:** Cryptographic identity verification, no passwords
+4. **Performance:** Only used for North-South (external) traffic; East-West uses local LAN
+
+**Traffic Flow Examples:**
+
+- **External User → ArgoCD:**
+  1. DNS: `argocd.brahmanda.abhishek-kashyap.com` → Kshitiz public IP
+  2. Kshitiz Caddy receives HTTPS request
+  3. Caddy proxies via Nebula mesh to `10.42.1.210:443` (control plane)
+  4. Traefik ingress on control plane routes to ArgoCD pod
+
+- **Pod-to-Pod on Same Node:** Direct local communication (no Nebula)
+- **Pod-to-Pod Across Nodes:** Via local LAN (192.168.68.x) using CNI
+
+**Certificate Authority (CA) Structure:**
+
+All Nebula nodes trust a single root CA. Each node receives an individual certificate signed by this CA:
+
+- **Identity:** Unique node name (e.g., `vyom-control-plane-1`)
+- **IP Assignment:** Specific Nebula mesh IP (e.g., `10.42.1.210/16`)
+- **Groups:** Role-based groups for firewall rules (e.g., `vyom,control-plane`)
+
+</details>
 
 #### **Nebula Identity (Vyom Nodes)**
 
-We use a shared certificate for all Vyom nodes to simplify bootstrapping.
+Each Vyom node requires its own certificate with a specific Nebula mesh IP. We use a consistent IP addressing scheme where the last octet matches across all systems (VM ID, LAN IP, Nebula IP) for operational simplicity.
+
+**IP Addressing Scheme:**
+
+| Node | VM ID | LAN IP | Nebula IP |
+|------|-------|--------|-----------|
+| vyom-control-plane-1 | 210 | 192.168.68.210 | 10.42.1.210 |
+| vyom-worker-1 | 211 | 192.168.68.211 | 10.42.1.211 |
+| vyom-worker-2 | 212 | 192.168.68.212 | 10.42.1.212 |
+
+💡 **TIP:** This consistent numbering (210, 211, 212) reduces cognitive load - one number identifies the VM across all systems.
 
 > **⚠️ CRITICAL VERSION WARNING (See RCA-007):**
 > Ensure your local `nebula-cert` version matches the version being deployed to the nodes (currently **v1.10.0**).
 > Certificates generated by newer versions may not be readable by older binaries on the nodes.
 > Check version: `nebula-cert --version`
+> Install: Download from <https://github.com/slackhq/nebula/releases/tag/v1.10.0>
 
-1. **Generate the Vyom Group Certificate:**
+**Automated Certificate Generation:**
 
-   ```bash
-   cd ~/.nebula
-   # This creates a certificate for the 'vyom' group within the 10.42.1.x subnet
-   nebula-cert sign -name "vyom-nodes" -groups "vyom" -networks "10.42.1.0/24"
-   ```
+Instead of manually generating each certificate, use the automated script:
 
-   This creates `vyom-nodes.crt` and `vyom-nodes.key`.
+```bash
+# Generate certificates for default cluster (1 control plane, 2 workers)
+make nebula-certs
+```
 
-2. **Store in 1Password:**
+This generates:
 
-   1. Create a new **Secure Note** item in the `Project-Brahmanda` vault.
-   2. **Title:** `Nebula-Vyom-Nodes-Certificate`
-   3. **Add Field → Text:** `vyom-nodes.crt` → Paste contents of `~/.nebula/vyom-nodes.crt`
-   4. **Add Field → Text:** `vyom-nodes.key` → Paste contents of `~/.nebula/vyom-nodes.key`
-   5. Save the item.
+- Nebula CA (if not exists)
+- Kshitiz lighthouse certificate (10.42.0.1/16)
+- Vyom node certificates (10.42.1.210, .211, .212)
+- Stores all in 1Password with metadata
+- Creates Ansible `host_vars/` structure
+
+Idempotent - safe to re-run.
+
+**✅ Verification:**
+
+```bash
+# Quick check - verify control plane certificate exists
+op read "op://Project-Brahmanda/Nebula-Vyom-Control-Plane-1-Certificate/vyom-control-plane-1.crt"
+```
+
+<details>
+<summary>📚 What was generated? (Click to expand)</summary>
+
+**1Password Items Created:**
+
+- `Nebula-CA-Root-Certificate` (CA cert + key)
+- `Nebula-Kshitiz-Lighthouse-Certificate` (lighthouse cert + key + metadata)
+- `Nebula-Vyom-Control-Plane-1-Certificate` (node cert + key + IPs)
+- `Nebula-Vyom-Worker-1-Certificate` (node cert + key + IPs)
+- `Nebula-Vyom-Worker-2-Certificate` (node cert + key + IPs)
+
+**Ansible Files Created:**
+
+- `samsara/ansible/host_vars/vyom_control_plane_1/vault.tpl.yml`
+- `samsara/ansible/host_vars/vyom_worker_1/vault.tpl.yml`
+- `samsara/ansible/host_vars/vyom_worker_2/vault.tpl.yml`
+
+These vault templates will be processed in Phase 5 (Adhisthana) to generate encrypted vaults.
+
+**Verify All Certificates:**
+
+```bash
+op read "op://Project-Brahmanda/Nebula-CA-Root-Certificate/ca.crt"
+op read "op://Project-Brahmanda/Nebula-Kshitiz-Lighthouse-Certificate/kshitiz-lighthouse.crt"
+op read "op://Project-Brahmanda/Nebula-Vyom-Control-Plane-1-Certificate/vyom-control-plane-1.crt"
+op read "op://Project-Brahmanda/Nebula-Vyom-Worker-1-Certificate/vyom-worker-1.crt"
+op read "op://Project-Brahmanda/Nebula-Vyom-Worker-2-Certificate/vyom-worker-2.crt"
+```
+
+**Manual Generation (Reference Only):**
+
+If you need to understand the manual process or debug certificate issues:
+
+```bash
+cd ~/.nebula
+
+# Control Plane
+nebula-cert sign -name "vyom-control-plane-1" -ip "10.42.1.210/16" \
+  -groups "vyom,control-plane" -ca-crt ca.crt -ca-key ca.key
+
+# Workers
+nebula-cert sign -name "vyom-worker-1" -ip "10.42.1.211/16" \
+  -groups "vyom,worker" -ca-crt ca.crt -ca-key ca.key
+nebula-cert sign -name "vyom-worker-2" -ip "10.42.1.212/16" \
+  -groups "vyom,worker" -ca-crt ca.crt -ca-key ca.key
+```
+
+**Use `make nebula-certs` instead** - it handles 1Password storage and Ansible configuration automatically.
+
+</details>
+
+You're done! The certificates are ready. Continue to the next section.
 
 #### **Generate Prakriti Master Key**
 
@@ -712,9 +882,9 @@ This key will be baked into the `prakriti-template` golden image. It serves as a
 
 1. **Generate a dedicated key pair** temporarily on your local machine. We'll remove the key from local machine in the end.
 
-```bash
-ssh-keygen -t ed25519 -a 100 -f ~/.ssh/id_prakriti -C "abhishek@prakriti-master-key"
-```
+  ```bash
+  ssh-keygen -t ed25519 -a 100 -f ~/.ssh/id_prakriti -C "abhishek@prakriti-master-key"
+  ```
 
 **When prompted:**
 
@@ -745,13 +915,13 @@ ssh-keygen -t ed25519 -a 100 -f ~/.ssh/id_prakriti -C "abhishek@prakriti-master-
 
 **✅ Verification:**
 
-```bash
-# Verify the private key is retrievable from 1Password
-op read "op://Project-Brahmanda/Prakriti Master Key/private key"
+  ```bash
+  # Verify the private key is retrievable from 1Password
+  op read "op://Project-Brahmanda/Prakriti Master Key/private key"
 
-# Verify the public key is also retrievable
-op read "op://Project-Brahmanda/Prakriti Master Key/public key"
-```
+  # Verify the public key is also retrievable
+  op read "op://Project-Brahmanda/Prakriti Master Key/public key"
+  ```
 
 #### **K3s Cluster Token (The Gatekeeper)**
 
@@ -766,9 +936,9 @@ We adhere to a **Declarative Secret Strategy**. We do not rely on the cluster to
 2. **Consecration:** Store this token immediately in **1Password** in a Password item named `K3s-Cluster-Token`.
 3. **Injection:** * Reference is added in **Vyom Vault Template** (`samsara/ansible/group_vars/vyom/vault.tpl.yml`):
 
-```yaml
-vault_k3s_token: "op://Project-Brahmanda/K3s-Cluster-Token/password"
-```
+  ```yaml
+  vault_k3s_token: "op://Project-Brahmanda/K3s-Cluster-Token/password"
+  ```
 
 - Run `make nidhi-tirodhana VAULT=vyom` (Concealment). This reads the template, fetches the token from 1Password, and seals it into the encrypted `vault.yml`.
 
@@ -819,10 +989,10 @@ Provisioning
 
 This password will encrypt all infrastructure secrets in Git.
 
-```bash
-# Generate a cryptographically secure password
-openssl rand -base64 32
-```
+  ```bash
+  # Generate a cryptographically secure password
+  openssl rand -base64 32
+  ```
 
 Copy the output (it will look like: `aBc123dEf456gHi789...`).
 
@@ -840,43 +1010,43 @@ Copy the output (it will look like: `aBc123dEf456gHi789...`).
 
 #### **Step 3: Prepare the Ansible Vault Directory Structure**
 
-```bash
-mkdir -p samsara/ansible/group_vars/brahmanda
-mkdir -p samsara/ansible/group_vars/kshitiz
-mkdir -p samsara/ansible/group_vars/vyom
-```
+  ```bash
+  mkdir -p samsara/ansible/group_vars/brahmanda
+  mkdir -p samsara/ansible/group_vars/kshitiz
+  mkdir -p samsara/ansible/group_vars/vyom
+  ```
 
 #### **Step 4: Populate the Ansible Vault with Secrets**
 
 Create the main vault file:
 
-```bash
-pushd samsara/ansible/group_vars/brahmanda
-cat > vault.yml << 'EOF'
----
-# Global Infrastructure Secrets
+  ```bash
+  pushd samsara/ansible/group_vars/brahmanda
+  cat > vault.yml << 'EOF'
+  ---
+  # Global Infrastructure Secrets
 
-# Nebula CA Private Key
-nebula_ca_key: |
-EOF
-```
+  # Nebula CA Private Key
+  nebula_ca_key: |
+  EOF
+  ```
 
 Now append the Nebula CA key:
 
-```bash
-cat ~/.nebula/ca.key >> vault.yml
-```
+  ```bash
+  cat ~/.nebula/ca.key >> vault.yml
+  ```
 
 Add SSH private key:
 
-```bash
-cat >> vault.yml << 'EOF'
+  ```bash
+  cat >> vault.yml << 'EOF'
 
-# SSH Private Key for Vyom K3s Nodes which will be added in Brahmloka
-ssh_private_key: |
-EOF
-cat ~/.ssh/id_prakriti >> vault.yml
-```
+  # SSH Private Key for Vyom K3s Nodes which will be added in Brahmloka
+  ssh_private_key: |
+  EOF
+  cat ~/.ssh/id_prakriti >> vault.yml
+  ```
 
 **Important:** The file is currently in plain text. We'll encrypt it in the next step.
 
@@ -884,10 +1054,10 @@ cat ~/.ssh/id_prakriti >> vault.yml
 
 Return to the repository root and encrypt the vault:
 
-```bash
-popd # Change current directory to project-brahmanda root
-make tirodhana VAULT=brahmanda
-```
+  ```bash
+  popd # Change current directory to project-brahmanda root
+  make tirodhana VAULT=brahmanda
+  ```
 
 This will:
 
@@ -954,7 +1124,7 @@ This phase embodies the **Weapon of Detachment**. We create an `answer.toml` fil
 
 Think of it as a layered approach:
 
-```
+```txt
 Phase 2 (Sanghatana): Hardware assembly → Operational compute node
 Phase 6 (Pratistha):  answer.toml → Proxmox VE OS installed on NUC
 Phase 7 (Samsara):    Terraform → VMs created inside Proxmox → Ansible → K3s cluster ready

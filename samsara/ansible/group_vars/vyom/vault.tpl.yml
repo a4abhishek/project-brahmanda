@@ -13,11 +13,8 @@
 k3s_token: "op://Project-Brahmanda/K3s-Cluster-Token/password"
 
 # 2. Nebula Configuration for Vyom Nodes
+# Shared CA certificate for all Vyom nodes
+# Per-host certificates are in host_vars/<hostname>/vault.tpl.yml
+# Generated automatically by: make nebula-certs
 nebula_ca_crt: |
-  op://Project-Brahmanda/Nebula-CA-Root-Certificate/ca.crt
-
-nebula_node_crt: |
-  op://Project-Brahmanda/Nebula-Vyom-Nodes-Certificate/vyom-nodes.crt
-
-nebula_node_key: |
-  op://Project-Brahmanda/Nebula-Vyom-Nodes-Certificate/vyom-nodes.key
+  op://Project-Brahmanda/Nebula-CA-Root-Certificate/add more/ca.crt

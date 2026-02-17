@@ -86,6 +86,7 @@ endef
 # These targets do not represent files.
 .PHONY: help check_tools install_tools check_auth init \
 	nidhi-tirodhana nidhi-avirbhava samshodhana nidhi-nikasha \
+	nebula-certs \
 	pratistha samskara mukti srishti sarga samsara visarga \
 	kshitiz kshitiz-locked kshitiz-impl \
 	vyom vyom-locked vyom-impl \
@@ -142,11 +143,18 @@ help:
 	@echo "  samshodhana     : 📝    (Editing) Edits a specific Ansible Vault."
 	@echo "  nidhi-nikasha   : 🪨💎  (Treasury Touchstone Test) Verifies all vaults can be decrypted."
 	@echo ""
+	@echo "Certificate Management:"
+	@echo "  nebula-certs    : 🔐🌌  Generates Nebula mesh certificates for Vyom nodes (idempotent)."
+	@echo ""
 	@echo "Parameters:"
 	@echo "  VAULT=<name>          : Target specific vault (brahmanda|kshitiz|vyom)."
 	@echo "                           If omitted: nidhi-tirodhana/nidhi-avirbhava process all vaults."
 	@echo "                           Required for: samshodhana (cannot edit multiple)."
 	@echo "                           Example: make samshodhana VAULT=kshitiz"
+	@echo ""
+	@echo "  CONTROL_PLANE_COUNT=<n> : Number of control plane nodes for nebula-certs (default: 1)."
+	@echo "  WORKER_COUNT=<n>         : Number of worker nodes for nebula-certs (default: 2)."
+	@echo "                              Example: make nebula-certs CONTROL_PLANE_COUNT=1 WORKER_COUNT=2"
 	@echo ""
 	@echo "  ISO_VERSION=<version>  : Proxmox version for pratistha (default: 9.1-1)."
 	@echo "  ROOT_PASSWORD=<pass>   : Root password (use 1Password: \\$$\(op read '...'\\))."
@@ -205,6 +213,19 @@ nidhi-tirodhana: install-python-requirements
 				echo "  ⚠️  No template found for $$vault (skipping)"; \
 			fi; \
 		done; \
+		for host_dir in samsara/ansible/host_vars/*; do \
+			if [ -d "$$host_dir" ] && [ -f "$$host_dir/vault.tpl.yml" ]; then \
+				host=$$(basename "$$host_dir"); \
+				echo "  → Processing host: $$host..."; \
+				.venv/bin/python3 scripts/inject-secrets.py "$$host_dir/vault.tpl.yml" "$$host_dir/vault.tmp.yml" && \
+				(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault encrypt "host_vars/$$host/vault.tmp.yml" \
+					--encrypt-vault-id default \
+					--vault-password-file=../../scripts/get-vault-password.sh \
+					--output="host_vars/$$host/vault.yml") && \
+				rm -f "$$host_dir/vault.tmp.yml" && \
+				echo "  ✅ $$host treasury secured"; \
+			fi; \
+		done; \
 		echo "✅ All treasure repositories secured successfully"; \
 	else \
 		echo "💎🔒 Nidhi-Tirodhana: Generating and securing $(VAULT) treasury..."; \
@@ -219,6 +240,21 @@ nidhi-tirodhana: install-python-requirements
 			--output="group_vars/$(VAULT)/vault.yml") && \
 		rm -f "samsara/ansible/group_vars/$(VAULT)/vault.tmp.yml" && \
 		echo "✅ $(VAULT) treasury secured successfully"; \
+		if [ "$(VAULT)" = "vyom" ]; then \
+			for host_dir in samsara/ansible/host_vars/vyom-*; do \
+				if [ -d "$$host_dir" ] && [ -f "$$host_dir/vault.tpl.yml" ]; then \
+					host=$$(basename "$$host_dir"); \
+					echo "  → Processing host: $$host..."; \
+					.venv/bin/python3 scripts/inject-secrets.py "$$host_dir/vault.tpl.yml" "$$host_dir/vault.tmp.yml" && \
+					(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault encrypt "host_vars/$$host/vault.tmp.yml" \
+						--encrypt-vault-id default \
+						--vault-password-file=../../scripts/get-vault-password.sh \
+						--output="host_vars/$$host/vault.yml") && \
+					rm -f "$$host_dir/vault.tmp.yml" && \
+					echo "  ✅ $$host treasury secured"; \
+				fi; \
+			done; \
+		fi; \
 	fi
 
 tirodhana: nidhi-tirodhana  # Alias for backward compatibility
@@ -236,6 +272,15 @@ nidhi-nikasha:
 			echo "  ⚠️  No vault found for $$vault (skipping)"; \
 		fi; \
 	done
+	@for host_dir in samsara/ansible/host_vars/*; do \
+		if [ -d "$$host_dir" ] && [ -f "$$host_dir/vault.yml" ]; then \
+			host=$$(basename "$$host_dir"); \
+			echo "  → Examining host: $$host..."; \
+			(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault view "host_vars/$$host/vault.yml" \
+				--vault-password-file=../../scripts/get-vault-password.sh > /dev/null) && \
+			echo "  ✅ $$host treasury intact"; \
+		fi; \
+	done
 	@echo "✅ All treasuries verified and secure"
 
 nikasha: nidhi-nikasha  # Alias for backward compatibility
@@ -250,6 +295,13 @@ nidhi-avirbhava:
 				(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault decrypt "group_vars/$$vault/vault.yml" --vault-password-file ../../scripts/get-vault-password.sh); \
 			fi; \
 		done; \
+		for host_dir in samsara/ansible/host_vars/*; do \
+			if [ -d "$$host_dir" ] && [ -f "$$host_dir/vault.yml" ] && head -n1 "$$host_dir/vault.yml" | grep -q '\$$ANSIBLE_VAULT'; then \
+				host=$$(basename "$$host_dir"); \
+				echo "  - Decrypting host: $$host..."; \
+				(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault decrypt "host_vars/$$host/vault.yml" --vault-password-file ../../scripts/get-vault-password.sh); \
+			fi; \
+		done; \
 		echo "✅ All treasure repositories manifested successfully"; \
 	else \
 		echo "💎🔓 Nidhi-Avirbhava: Manifesting $(VAULT) treasury..."; \
@@ -258,6 +310,15 @@ nidhi-avirbhava:
 			echo "✅ $(VAULT) treasury manifested successfully"; \
 		else \
 			echo "⚠️  $(VAULT) vault not found or already decrypted (skipping)"; \
+		fi; \
+		if [ "$(VAULT)" = "vyom" ]; then \
+			for host_dir in samsara/ansible/host_vars/vyom-*; do \
+				if [ -d "$$host_dir" ] && [ -f "$$host_dir/vault.yml" ] && head -n1 "$$host_dir/vault.yml" | grep -q '\$$ANSIBLE_VAULT'; then \
+					host=$$(basename "$$host_dir"); \
+					echo "  - Decrypting host: $$host..."; \
+					(cd samsara/ansible && $(ANSIBLE_ENV) ansible-vault decrypt "host_vars/$$host/vault.yml" --vault-password-file ../../scripts/get-vault-password.sh); \
+				fi; \
+			done; \
 		fi; \
 	fi
 
@@ -275,6 +336,45 @@ nidhi-samshodhana:
 	@echo "SUCCESS: $(VAULT) vault editing complete."
 
 samshodhana: nidhi-samshodhana  # Alias for backward compatibility
+
+# --- Certificate Management ---
+
+# Target: nebula-certs
+# Description: Generates Nebula mesh certificates for Vyom nodes (idempotent)
+#              Certificates are stored in 1Password with metadata (nebula_ip, vm_id, lan_ip)
+#              Skips already-existing certificates for safe re-execution
+# Parameters:
+#   CONTROL_PLANE_COUNT  - Number of control plane nodes (default: 1)
+#   WORKER_COUNT         - Number of worker nodes (default: 2)
+#   FORCE                - Force regeneration even if certificates already exist (default: false, use with caution)
+nebula-certs:
+	@echo "🔐🌌 Generating Nebula mesh certificates for Vyom nodes..."
+	@if [ ! -f scripts/generate-nebula-certs.sh ]; then \
+		echo "ERROR: scripts/generate-nebula-certs.sh not found"; \
+		exit 1; \
+	fi
+	@chmod +x scripts/generate-nebula-certs.sh
+	@if [ -z "$(CONTROL_PLANE_COUNT)" ]; then \
+		echo "INFO: CONTROL_PLANE_COUNT not set, defaulting to 1"; \
+	fi
+	@if [ -z "$(WORKER_COUNT)" ]; then \
+		echo "INFO: WORKER_COUNT not set, defaulting to 2"; \
+	fi
+	@if [ -z "$(FORCE)" ]; then \
+		./scripts/generate-nebula-certs.sh \
+			--control-plane-count "$(or $(CONTROL_PLANE_COUNT),1)" \
+			--worker-count "$(or $(WORKER_COUNT),2)" || exit $$?; \
+	else \
+		echo "INFO: FORCE is set - will clean up stale certificate files if found"; \
+		./scripts/generate-nebula-certs.sh \
+			--control-plane-count "$(or $(CONTROL_PLANE_COUNT),1)" \
+			--worker-count "$(or $(WORKER_COUNT),2)" \
+			--force || exit $$?; \
+	fi
+	@echo ""
+	@echo "✅ Nebula certificate generation complete."
+	@echo "📝 Generated host_vars structure in samsara/ansible/host_vars/"
+	@echo "🔄 Next: Run 'make nidhi-tirodhana VAULT=vyom' to generate ansible vaults."
 
 # --- Tooling Setup ---
 

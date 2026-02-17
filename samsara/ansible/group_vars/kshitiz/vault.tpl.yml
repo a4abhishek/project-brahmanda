@@ -8,15 +8,15 @@
 
 # Nebula CA Certificate (Public) - Required by all nodes to verify others
 nebula_ca_crt: |
-  op://Project-Brahmanda/Nebula-CA-Root-Certificate/ca.crt
+  op://Project-Brahmanda/Nebula-CA-Root-Certificate/add more/ca.crt
 
 # Nebula Lighthouse Certificate
 nebula_lighthouse_crt: |
-  op://Project-Brahmanda/Nebula-Kshitiz-Lighthouse-Certificate/kshitiz-lighthouse.crt
+  op://Project-Brahmanda/Nebula-Kshitiz-Lighthouse-Certificate/add more/kshitiz-lighthouse.crt
 
 # Nebula Lighthouse Private Key
 nebula_lighthouse_key: |
-  op://Project-Brahmanda/Nebula-Kshitiz-Lighthouse-Certificate/kshitiz-lighthouse.key
+  op://Project-Brahmanda/Nebula-Kshitiz-Lighthouse-Certificate/add more/kshitiz-lighthouse.key
 
 # ACME Email for Let's Encrypt (Caddy)
 acme_email: "op://Project-Brahmanda/ACME-Email/Identification/email"

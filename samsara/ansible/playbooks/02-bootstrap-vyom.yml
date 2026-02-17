@@ -14,10 +14,12 @@
 
   # Load variables hierarchy:
   # 1. Group Vars (Common settings)
+  # 2. Host Vars (Specific identities/Nidhi)
   vars_files:
     - ../group_vars/brahmanda/vault.yml
     - ../group_vars/vyom/vars.yml
     - ../group_vars/vyom/vault.yml
+    - "../host_vars/{{ inventory_hostname }}/vault.yml"
 
   gather_facts: false # Wait for connection first
 
@@ -34,40 +36,57 @@
       cert: /etc/nebula/host.crt
       key: /etc/nebula/host.key
 
-    # Lighthouse Configuration
-    lighthouses: ["10.42.0.1"]
+    # Lighthouse nodes (for role template - internal use only)
+    lighthouses:
+      - "10.42.0.1"
 
+    # Lighthouse Configuration (actual Nebula config)
     lighthouse:
       am_lighthouse: false
+      serve_dns: false
       interval: 60
+      hosts:  # ← Changed from 'nodes' to 'hosts' (matches Nebula config format)
+        - "10.42.0.1"
 
-    # Discovery
+    # Discovery - Dictionary format matching Nebula config
+    # Format: "nebula_ip": ["public_ip:port"]
     static_host_map:
-      - internal_ip: "10.42.0.1"
-        public_ip: "{{ hostvars['kshitiz-lighthouse']['ansible_host'] }}" # Kshitiz Lighthouse Public IP
-        public_port: 4242
+      "10.42.0.1":
+        - "{{ hostvars['kshitiz-lighthouse']['ansible_host'] }}:4242"
 
     # Network Configuration
     listen:
       host: 0.0.0.0
       port: 4242
 
+    # NAT Traversal (nested structure matching Nebula format)
+    punchy:
+      punch: true      # Continuously punch to keep NAT mappings alive
+      respond: true    # Respond to punches from difficult NATs
+
     tun:
       disabled: false
       dev: nebula1 # Default. But explicitly set interface name for consistency
 
-    firewall:
-      outbound:
-        - port: any
-          proto: any
-          host: any
-      inbound:
-        - port: any
-          proto: icmp
-          host: any
-        - port: 6443
-          proto: tcp
-          host: any
+    # Firewall Rules (Top-level as role expects)
+    outbound:
+      - port: any
+        proto: any
+        host: any
+
+    inbound:
+      - port: any
+        proto: icmp
+        host: any
+      - port: 6443
+        proto: tcp
+        host: any
+      - port: 80
+        proto: tcp
+        host: any
+      - port: 443
+        proto: tcp
+        host: any
 
   # ---------------------------------------------------------------------------
   # Phase 0: Validation & Preparation
@@ -170,9 +189,104 @@
   # ---------------------------------------------------------------------------
   roles:
     - role: trozz.ansible_nebula
-      # Vars are now defined at Playbook level for higher precedence
+      # Vars are now defined at Playbook level with correct naming
 
   tasks:
+    # -------------------------------------------------------------------------
+    # Phase 1.5: Verify Nebula Installation (CRITICAL)
+    # -------------------------------------------------------------------------
+    - name: 🔍 Verify Nebula Config File Exists
+      ansible.builtin.stat:
+        path: /etc/nebula/config.yaml
+      register: nebula_config_stat
+      failed_when: not nebula_config_stat.stat.exists
+
+    - name: 🔍 Verify Nebula Config Contains Lighthouse
+      ansible.builtin.shell: |
+        grep -q "10.42.0.1" /etc/nebula/config.yaml
+      changed_when: false
+      failed_when: false
+      register: lighthouse_check
+
+    - name: ⚠️ Display Config if Lighthouse Missing
+      ansible.builtin.shell: cat /etc/nebula/config.yaml
+      when: lighthouse_check.rc != 0
+      register: nebula_config_content
+
+    - name: 💥 Fail if Lighthouse Not in Config
+      ansible.builtin.fail:
+        msg: |
+          Nebula configuration missing lighthouse 10.42.0.1!
+          Config content:
+          {{ nebula_config_content.stdout | default('Could not read config') }}
+      when: lighthouse_check.rc != 0
+
+    - name: 🔍 Verify Nebula Service Exists
+      ansible.builtin.systemd:
+        name: nebula
+        state: started
+        enabled: yes
+      register: nebula_service_result
+      failed_when: nebula_service_result.status.ActiveState != "active"
+
+    - name: 🔍 Verify Nebula Listening on UDP 4242
+      ansible.builtin.wait_for:
+        port: 4242
+        proto: udp
+        timeout: 10
+      failed_when: false
+      register: nebula_port_check
+
+    - name: ⚠️ Display Nebula Status if Port Check Failed
+      ansible.builtin.command: systemctl status nebula
+      when: nebula_port_check.failed
+      register: nebula_status_output
+      changed_when: false
+
+    - name: 💥 Fail if Nebula Not Listening
+      ansible.builtin.fail:
+        msg: |
+          Nebula service is not listening on UDP 4242!
+          Status:
+          {{ nebula_status_output.stdout | default('Unknown') }}
+      when: nebula_port_check.failed
+
+    - name: ⏳ Wait for Nebula Interface (nebula1) to Appear
+      ansible.builtin.wait_for:
+        path: /sys/class/net/nebula1
+        timeout: 30
+      register: nebula_interface_wait
+      failed_when: false
+
+    - name: 💥 Fail if Nebula Interface Not Created
+      ansible.builtin.fail:
+        msg: |
+          Nebula interface 'nebula1' not created after 30 seconds!
+          Check Nebula logs: journalctl -u nebula -n 50
+      when: nebula_interface_wait.failed
+
+    - name: ℹ️ Display Nebula Service Status (Success)
+      ansible.builtin.debug:
+        msg: "✅ Nebula service verified: Running, listening on UDP 4242, interface nebula1 active"
+
+    - name: 📋 Display Generated Nebula Config (Lighthouse Section)
+      ansible.builtin.shell: |
+        echo "=== Lighthouse Configuration ==="
+        grep -A 5 "^lighthouse:" /etc/nebula/config.yaml || echo "No lighthouse section found!"
+        echo ""
+        echo "=== Static Host Map ==="
+        grep -A 5 "^static_host_map:" /etc/nebula/config.yaml || echo "No static_host_map found!"
+        echo ""
+        echo "=== Punch Configuration ==="
+        grep "^punchy:" /etc/nebula/config.yaml || echo "No punchy found!"
+        grep "^punch_back:" /etc/nebula/config.yaml || echo "No punch_back found!"
+      register: nebula_config_debug
+      changed_when: false
+
+    - name: ℹ️ Show Config Debug Output
+      ansible.builtin.debug:
+        var: nebula_config_debug.stdout_lines
+
     # -------------------------------------------------------------------------
     # Phase 2: The Bridge (Discovery)
     # -------------------------------------------------------------------------
@@ -184,6 +298,56 @@
     # -------------------------------------------------------------------------
     # Phase 3: The Cluster (K3s)
     # -------------------------------------------------------------------------
+    - name: � Create K3s Manifests Directory (Pre-Bootstrap)
+      ansible.builtin.file:
+        path: /var/lib/rancher/k3s/server/manifests
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      when: inventory_hostname in groups['vyom_control_plane']
+
+    - name: 📝 Create Traefik HelmChartConfig (Enable hostNetwork)
+      ansible.builtin.copy:
+        dest: /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+        mode: '0644'
+        content: |
+          apiVersion: helm.cattle.io/v1
+          kind: HelmChartConfig
+          metadata:
+            name: traefik
+            namespace: kube-system
+          spec:
+            valuesContent: |-
+              deployment:
+                kind: DaemonSet
+              updateStrategy:
+                rollingUpdate:
+                  maxUnavailable: 1
+                  maxSurge: 0
+              hostNetwork: true
+              podSecurityContext:
+                runAsNonRoot: false
+                runAsUser: 0
+              securityContext:
+                capabilities:
+                  add:
+                    - NET_BIND_SERVICE
+                  drop:
+                    - ALL
+              service:
+                type: ClusterIP
+              ports:
+                web:
+                  port: 80
+                  exposedPort: 80
+                  containerPort: 80
+                websecure:
+                  port: 443
+                  exposedPort: 443
+                  containerPort: 443
+      when: inventory_hostname in groups['vyom_control_plane']
+
     - name: ☸️ Bootstrap K3s (Split-Horizon)
       include_role:
         name: xanmanning.k3s
@@ -267,3 +431,29 @@
     - name: ✅ Verify Node Identity
       debug:
         msg: "Node {{ inventory_hostname }} active. LAN: {{ ansible_facts.default_ipv4.address }}, Mesh: {{ ansible_facts.nebula1.ipv4.address | default('Unknown') }}"
+
+    - name: 🔍 Test Nebula Connectivity to Lighthouse
+      ansible.builtin.command:
+        cmd: ping -c 3 -W 5 10.42.0.1
+      register: lighthouse_ping
+      failed_when: lighthouse_ping.rc != 0
+      changed_when: false
+
+    - name: ✅ Lighthouse Connectivity
+      debug:
+        msg: "✓ Nebula mesh connectivity to Lighthouse (10.42.0.1) verified"
+      when: lighthouse_ping.rc == 0
+
+    - name: 🔍 Test Nebula Connectivity Between Nodes (Control Plane Only)
+      ansible.builtin.command:
+        cmd: ping -c 2 -W 5 {{ hostvars[item].ansible_facts.nebula1.ipv4.address }}
+      loop: "{{ groups['vyom_workers'] }}"
+      register: worker_ping
+      failed_when: false
+      changed_when: false
+      when: inventory_hostname in groups['vyom_control_plane']
+
+    - name: ✅ Inter-Node Connectivity Status
+      debug:
+        msg: "{% if worker_ping.results | selectattr('rc', 'equalto', 0) | list | length == groups['vyom_workers'] | length %}✓ All workers reachable via Nebula mesh{% else %}⚠ Some workers unreachable - check Nebula certificates{% endif %}"
+      when: inventory_hostname in groups['vyom_control_plane'] and worker_ping.results is defined

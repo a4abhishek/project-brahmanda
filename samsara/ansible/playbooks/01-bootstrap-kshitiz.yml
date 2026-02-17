@@ -118,7 +118,7 @@
     # -------------------------------------------------------------------------
     # Phase 2: Reverse Proxy (Caddy)
     # -------------------------------------------------------------------------
-    
+
     # Create swap to prevent OOM on nano instance (512MB RAM)
     - name: 🔄 Check if swap exists
       ansible.builtin.stat:
@@ -153,7 +153,7 @@
 
     - name: 📦 Install Caddy dependencies
       ansible.builtin.apt:
-        name: 
+        name:
           - debian-keyring
           - debian-archive-keyring
           - apt-transport-https
