@@ -1,0 +1,69 @@
+---
+- name: 🔍 Nebula Mesh Diagnostics
+  hosts: k3s_cluster
+  become: true
+  vars_files:
+    - ../group_vars/brahmanda/vault.yml
+    - ../group_vars/vyom/vars.yml
+    - ../group_vars/vyom/vault.yml
+    - "../host_vars/{{ inventory_hostname }}/vault.yml"
+
+  tasks:
+    - name: ⚙️ Check Binary
+      command: /usr/bin/nebula --version
+      register: binary_info
+      ignore_errors: true
+
+    - name: 📊 Service Status
+      command: systemctl status nebula
+      register: service_status
+      ignore_errors: true
+
+    - name: 🛡️ Check Local Firewall (UFW)
+      command: ufw status
+      register: ufw_status
+      ignore_errors: true
+
+    - name: 🌐 Interface Status
+      command: ip addr show
+      register: ip_info
+
+    - name: 🔑 Certificate Identity
+      command: /usr/bin/nebula-cert print -path /etc/nebula/host.crt
+      register: cert_info
+      ignore_errors: true
+
+    - name: 📡 Test Connection to Lighthouse (10.42.0.1)
+      command: ping -c 3 10.42.0.1
+      register: ping_lighthouse
+      ignore_errors: true
+
+    - name: 📡 Test Inter-Node Mesh Connectivity
+      shell: "ping -c 2 10.42.1.210 && ping -c 2 10.42.1.211 && ping -c 2 10.42.1.212"
+      register: ping_mesh
+      ignore_errors: true
+
+    - name: 🧪 Validate Configuration File
+      command: /usr/bin/nebula -config /etc/nebula/config.yaml -test
+      register: config_test
+      ignore_errors: true
+
+    - name: 📝 Output Diagnostics
+      debug:
+        msg:
+          - "--- BINARY ---"
+          - "{{ binary_info.stdout | default(binary_info.stderr) }}"
+          - "--- SERVICE ---"
+          - "{{ service_status.stdout | default(service_status.stderr) }}"
+          - "--- UFW STATUS ---"
+          - "{{ ufw_status.stdout | default('UFW NOT INSTALLED') }}"
+          - "--- CERTIFICATE ---"
+          - "{{ cert_info.stdout | default('CERT MISSING') }}"
+          - "--- CONFIG TEST ---"
+          - "{{ config_test.stdout | default(config_test.stderr) }}"
+          - "--- NEBULA IP ---"
+          - "{{ ip_info.stdout | regex_findall('10\\.42\\.\\d+\\.\\d+') }}"
+          - "--- PING LIGHTHOUSE ---"
+          - "{{ ping_lighthouse.stdout | default('PING FAILED') }}"
+          - "--- PING MESH ---"
+          - "{{ ping_mesh.stdout | default(ping_mesh.stderr) }}"

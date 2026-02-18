@@ -3,8 +3,8 @@
 # generate-nebula-certs.sh - Nebula Certificate Generation & 1Password Storage
 #
 # This script generates Nebula mesh certificates for the Brahmanda infrastructure:
-#   - Kshitiz Lighthouse (10.42.0.1/16) - Edge gateway and Nebula coordinator
-#   - Vyom Control Plane nodes (10.42.1.210+) - K3s control plane with consistent IPs
+#   - Kshitiz Lighthouse (10.100.0.1/16) - Edge gateway and Nebula coordinator
+#   - Vyom Control Plane nodes (10.100.1.210+) - K3s control plane with consistent IPs
 #   - Vyom Worker nodes (continuing from control plane) - K3s workers
 #
 # All certificates are stored in 1Password with metadata (nebula_ip, vm_id, lan_ip).
@@ -216,11 +216,11 @@ manage_ca_certificate() {
   fi
 }
 
-# Generate Kshitiz Lighthouse certificate (10.42.0.1/16)
+# Generate Kshitiz Lighthouse certificate (10.100.0.1/16)
 # This is the Nebula coordinator on the AWS Lightsail edge gateway
 generate_kshitiz_lighthouse() {
   local node_name="kshitiz-lighthouse"
-  local nebula_ip="10.42.0.1"
+  local nebula_ip="10.100.0.1"
   local op_item_name="Nebula-Kshitiz-Lighthouse-Certificate"
 
   info "Generating Kshitiz Lighthouse certificate..."
@@ -246,7 +246,7 @@ generate_kshitiz_lighthouse() {
   nebula-cert sign \
     -name "${node_name}" \
     -ip "${nebula_ip}/16" \
-    -groups "kshitiz,lighthouse" \
+    -groups "kshitiz" \
     -ca-crt ca.crt \
     -ca-key ca.key
 
@@ -272,7 +272,7 @@ generate_kshitiz_lighthouse() {
 }
 
 # Generate Vyom Control Plane certificates
-# Starting at 10.42.1.210 (VM ID 210), incrementing by node index
+# Starting at 10.100.1.210 (VM ID 210), incrementing by node index
 # Arguments:
 #   $1 - Number of control plane nodes
 generate_vyom_control_planes() {
@@ -282,7 +282,7 @@ generate_vyom_control_planes() {
   for i in $(seq 1 "${count}"); do
     local node_id=$((VYOM_IP_START + i - 1))
     local node_name="vyom-control-plane-${i}"
-    local nebula_ip="10.42.1.${node_id}"
+    local nebula_ip="10.100.1.${node_id}"
     local op_item_name="Nebula-Vyom-Control-Plane-${i}-Certificate"
 
     # Check if certificate already exists in 1Password
@@ -306,7 +306,7 @@ generate_vyom_control_planes() {
     nebula-cert sign \
       -name "${node_name}" \
       -ip "${nebula_ip}/16" \
-      -groups "vyom,control-plane" \
+      -groups "vyom,vyom-control-plane" \
       -ca-crt ca.crt \
       -ca-key ca.key
 
@@ -334,7 +334,7 @@ generate_vyom_control_planes() {
 }
 
 # Generate Vyom Worker certificates
-# Continuing from control plane (e.g., 10.42.1.211 if 1 control plane)
+# Continuing from control plane (e.g., 10.100.1.211 if 1 control plane)
 # Arguments:
 #   $1 - Number of worker nodes
 #   $2 - Control plane count (to calculate starting IP)
@@ -348,7 +348,7 @@ generate_vyom_workers() {
   for i in $(seq 1 "${count}"); do
     local node_id=$((worker_start + i - 1))
     local node_name="vyom-worker-${i}"
-    local nebula_ip="10.42.1.${node_id}"
+    local nebula_ip="10.100.1.${node_id}"
     local op_item_name="Nebula-Vyom-Worker-${i}-Certificate"
 
     # Check if certificate already exists in 1Password
@@ -372,7 +372,7 @@ generate_vyom_workers() {
     nebula-cert sign \
       -name "${node_name}" \
       -ip "${nebula_ip}/16" \
-      -groups "vyom,worker" \
+      -groups "vyom,vyom-worker" \
       -ca-crt ca.crt \
       -ca-key ca.key
 
@@ -502,22 +502,22 @@ print_summary() {
   echo ""
 
   if [[ "${SKIP_KSHITIZ}" == "false" ]]; then
-    info "Kshitiz Lighthouse: 10.42.0.1"
+    info "Kshitiz Lighthouse: 10.100.0.1"
   fi
 
   info "Control Plane Nodes: ${CONTROL_PLANE_COUNT}"
   if [[ "${CONTROL_PLANE_COUNT}" == "1" ]]; then
-    info "  IP: 10.42.1.${VYOM_IP_START}"
+    info "  IP: 10.100.1.${VYOM_IP_START}"
   else
-    info "  IP Range: 10.42.1.${VYOM_IP_START} - 10.42.1.$((VYOM_IP_START + CONTROL_PLANE_COUNT - 1))"
+    info "  IP Range: 10.100.1.${VYOM_IP_START} - 10.100.1.$((VYOM_IP_START + CONTROL_PLANE_COUNT - 1))"
   fi
 
   info "Worker Nodes: ${WORKER_COUNT}"
   local worker_start=$((VYOM_IP_START + CONTROL_PLANE_COUNT))
   if [[ "${WORKER_COUNT}" == "1" ]]; then
-    info "  IP: 10.42.1.${worker_start}"
+    info "  IP: 10.100.1.${worker_start}"
   else
-    info "  IP Range: 10.42.1.${worker_start} - 10.42.1.$((worker_start + WORKER_COUNT - 1))"
+    info "  IP Range: 10.100.1.${worker_start} - 10.100.1.$((worker_start + WORKER_COUNT - 1))"
   fi
 
   echo ""

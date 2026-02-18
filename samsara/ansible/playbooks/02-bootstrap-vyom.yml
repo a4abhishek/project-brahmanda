@@ -30,63 +30,62 @@
     # --- Nebula Configuration ---
     nebula_version: "1.10.0" # Force this version
 
-    # Identity (We pre-placed these files)
+    # Identity (Certificate paths on target nodes)
     pki:
       ca: /etc/nebula/ca.crt
       cert: /etc/nebula/host.crt
       key: /etc/nebula/host.key
-
-    # Lighthouse nodes (for role template - internal use only)
-    lighthouses:
-      - "10.42.0.1"
-
-    # Lighthouse Configuration (actual Nebula config)
-    lighthouse:
-      am_lighthouse: false
-      serve_dns: false
-      interval: 60
-      hosts:  # ← Changed from 'nodes' to 'hosts' (matches Nebula config format)
-        - "10.42.0.1"
-
-    # Discovery - Dictionary format matching Nebula config
-    # Format: "nebula_ip": ["public_ip:port"]
-    static_host_map:
-      "10.42.0.1":
-        - "{{ hostvars['kshitiz-lighthouse']['ansible_host'] }}:4242"
 
     # Network Configuration
     listen:
       host: 0.0.0.0
       port: 4242
 
-    # NAT Traversal (nested structure matching Nebula format)
-    punchy:
-      punch: true      # Continuously punch to keep NAT mappings alive
-      respond: true    # Respond to punches from difficult NATs
-
     tun:
       disabled: false
       dev: nebula1 # Default. But explicitly set interface name for consistency
 
-    # Firewall Rules (Top-level as role expects)
+    # Firewall Rules - Group-based security
+    # Groups: kshitiz (edge gateway), vyom (all compute nodes)
     outbound:
       - port: any
         proto: any
         host: any
 
     inbound:
+      # Allow ICMP from any Nebula host for connectivity testing
       - port: any
         proto: icmp
         host: any
+      
+      # Allow SSH from kshitiz only (management from edge bastion)
+      - port: 22
+        proto: tcp
+        groups:
+          - kshitiz
+      
+      # Allow K3s API from kshitiz and vyom (cluster access + inter-node)
       - port: 6443
         proto: tcp
-        host: any
+        groups:
+          - kshitiz
+          - vyom
+      
+      # Allow HTTP/HTTPS from edge only (ingress traffic from internet)
       - port: 80
         proto: tcp
-        host: any
+        groups:
+          - kshitiz
       - port: 443
         proto: tcp
-        host: any
+        groups:
+          - kshitiz
+      
+      # Allow all inter-cluster communication (compute-to-compute)
+      - port: any
+        proto: any
+        groups:
+          - vyom
 
   # ---------------------------------------------------------------------------
   # Phase 0: Validation & Preparation
@@ -187,41 +186,164 @@
   # ---------------------------------------------------------------------------
   # Phase 1: The Mesh (Nebula)
   # ---------------------------------------------------------------------------
-  roles:
-    - role: trozz.ansible_nebula
-      # Vars are now defined at Playbook level with correct naming
-
   tasks:
+    # -------------------------------------------------------------------------
+    # Phase 1: Deploy Nebula (Custom Implementation - Role-Free)
+    # -------------------------------------------------------------------------
+    - name: 📥 Download Nebula Binary
+      ansible.builtin.get_url:
+        url: "https://github.com/slackhq/nebula/releases/download/v{{ nebula_version }}/nebula-linux-amd64.tar.gz"
+        dest: "/tmp/nebula-{{ nebula_version }}-linux-amd64.tar.gz"
+        mode: '0644'
+
+    - name: 📦 Extract Nebula Binary
+      ansible.builtin.unarchive:
+        src: "/tmp/nebula-{{ nebula_version }}-linux-amd64.tar.gz"
+        dest: /tmp/
+        remote_src: yes
+
+    - name: 📥 Install Nebula Binary
+      ansible.builtin.copy:
+        src: /tmp/nebula
+        dest: /usr/bin/nebula
+        mode: '0755'
+        owner: root
+        group: root
+        remote_src: yes
+
+    - name: 📥 Install Nebula-Cert Binary
+      ansible.builtin.copy:
+        src: /tmp/nebula-cert
+        dest: /usr/bin/nebula-cert
+        mode: '0755'
+        owner: root
+        group: root
+        remote_src: yes
+
+    - name: 📝 Generate Nebula Configuration from Template
+      ansible.builtin.template:
+        src: nebula-node-config.yaml.j2
+        dest: /etc/nebula/config.yaml
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: 📝 Create Nebula Systemd Service from Template
+      ansible.builtin.template:
+        src: nebula.service.j2
+        dest: /etc/systemd/system/nebula.service
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: 🔄 Reload Systemd Daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: 🚀 Enable and Start Nebula Service
+      ansible.builtin.systemd:
+        name: nebula
+        enabled: yes
+        state: started
     # -------------------------------------------------------------------------
     # Phase 1.5: Verify Nebula Installation (CRITICAL)
     # -------------------------------------------------------------------------
+    - name: 🔍 Verify Nebula Binaries Installed
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: nebula_binaries
+      failed_when: not nebula_binaries.stat.exists or not nebula_binaries.stat.executable
+      loop:
+        - /usr/bin/nebula
+        - /usr/bin/nebula-cert
+
+    - name: 🔍 Verify Nebula Version
+      ansible.builtin.command: /usr/bin/nebula --version
+      register: nebula_version_check
+      changed_when: false
+      failed_when: nebula_version not in nebula_version_check.stdout
+
+    - name: 🔍 Verify Nebula Certificates Exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: nebula_certs
+      failed_when: not nebula_certs.stat.exists
+      loop:
+        - /etc/nebula/ca.crt
+        - /etc/nebula/host.crt
+        - /etc/nebula/host.key
+
+    - name: 🔍 Verify Certificate Contains Correct Node IP
+      ansible.builtin.shell: |
+        /usr/bin/nebula-cert print -path /etc/nebula/host.crt
+      changed_when: false
+      register: cert_content
+
+    - name: ℹ️ Display Certificate Info
+      ansible.builtin.debug:
+        msg: "{{ cert_content.stdout }}"
+
+    - name: 🔍 Validate Certificate Has Nebula Network Range
+      ansible.builtin.shell: |
+        /usr/bin/nebula-cert print -path /etc/nebula/host.crt | grep -q "10.100"
+      changed_when: false
+      register: cert_network_check
+      failed_when: cert_network_check.rc != 0
+
+    - name: 📋 Extract Node IP from Certificate
+      ansible.builtin.shell: |
+        /usr/bin/nebula-cert print -path /etc/nebula/host.crt | grep "10.100" | grep -oE "10\.42\.[0-9]+\.[0-9]+" | head -1
+      changed_when: false
+      register: nebula_node_ip_extracted
+
+    - name: ℹ️ Display Extracted Node IP
+      ansible.builtin.debug:
+        msg: "Nebula node IP from certificate: {{ nebula_node_ip_extracted.stdout }}"
+
     - name: 🔍 Verify Nebula Config File Exists
       ansible.builtin.stat:
         path: /etc/nebula/config.yaml
       register: nebula_config_stat
       failed_when: not nebula_config_stat.stat.exists
 
-    - name: 🔍 Verify Nebula Config Contains Lighthouse
+    - name: 🔍 Verify Nebula Config Contains Lighthouse IP
       ansible.builtin.shell: |
-        grep -q "10.42.0.1" /etc/nebula/config.yaml
+        grep -q "10.100.0.1" /etc/nebula/config.yaml
       changed_when: false
       failed_when: false
       register: lighthouse_check
 
+    - name: 🔍 Verify Static Host Map Contains Kshitiz Public IP
+      ansible.builtin.shell: |
+        grep -A 3 "static_host_map:" /etc/nebula/config.yaml | grep -q "{{ hostvars['kshitiz-lighthouse']['ansible_host'] }}"
+      changed_when: false
+      failed_when: false
+      register: static_map_check
+
     - name: ⚠️ Display Config if Lighthouse Missing
       ansible.builtin.shell: cat /etc/nebula/config.yaml
-      when: lighthouse_check.rc != 0
+      when: lighthouse_check.rc != 0 or static_map_check.rc != 0
       register: nebula_config_content
+      changed_when: false
 
     - name: 💥 Fail if Lighthouse Not in Config
       ansible.builtin.fail:
         msg: |
-          Nebula configuration missing lighthouse 10.42.0.1!
+          Nebula configuration missing lighthouse 10.100.0.1!
           Config content:
           {{ nebula_config_content.stdout | default('Could not read config') }}
       when: lighthouse_check.rc != 0
 
-    - name: 🔍 Verify Nebula Service Exists
+    - name: 💥 Fail if Static Host Map Missing Kshitiz Public IP
+      ansible.builtin.fail:
+        msg: |
+          Nebula static_host_map missing Kshitiz public IP!
+          Expected: {{ hostvars['kshitiz-lighthouse']['ansible_host'] }}
+          Config content:
+          {{ nebula_config_content.stdout | default('Could not read config') }}
+      when: static_map_check.rc != 0
+
+    - name: 🔍 Verify Nebula Service Exists and Active
       ansible.builtin.systemd:
         name: nebula
         state: started
@@ -229,17 +351,21 @@
       register: nebula_service_result
       failed_when: nebula_service_result.status.ActiveState != "active"
 
+    - name: 🔍 Verify Nebula Process Running
+      ansible.builtin.shell: pgrep -x nebula
+      changed_when: false
+      register: nebula_process_check
+      failed_when: nebula_process_check.rc != 0
+
     - name: 🔍 Verify Nebula Listening on UDP 4242
-      ansible.builtin.wait_for:
-        port: 4242
-        proto: udp
-        timeout: 10
-      failed_when: false
+      ansible.builtin.shell: ss -ulnp | grep -q ":4242"
+      changed_when: false
       register: nebula_port_check
+      failed_when: false
 
     - name: ⚠️ Display Nebula Status if Port Check Failed
-      ansible.builtin.command: systemctl status nebula
-      when: nebula_port_check.failed
+      ansible.builtin.command: systemctl status nebula --no-pager
+      when: nebula_port_check.rc != 0
       register: nebula_status_output
       changed_when: false
 
@@ -249,7 +375,7 @@
           Nebula service is not listening on UDP 4242!
           Status:
           {{ nebula_status_output.stdout | default('Unknown') }}
-      when: nebula_port_check.failed
+      when: nebula_port_check.rc != 0
 
     - name: ⏳ Wait for Nebula Interface (nebula1) to Appear
       ansible.builtin.wait_for:
@@ -265,21 +391,58 @@
           Check Nebula logs: journalctl -u nebula -n 50
       when: nebula_interface_wait.failed
 
+    - name: 🔍 Verify Nebula Interface Has Correct IP
+      ansible.builtin.shell: |
+        ip addr show nebula1 | grep -q "{{ nebula_node_ip_extracted.stdout }}"
+      changed_when: false
+      register: interface_ip_check
+      failed_when: false
+      retries: 5
+      delay: 2
+      until: interface_ip_check.rc == 0
+
+    - name: 💥 Fail if Interface IP Incorrect
+      ansible.builtin.fail:
+        msg: |
+          Nebula interface 'nebula1' does not have expected IP from certificate!
+          Expected (from cert): {{ nebula_node_ip_extracted.stdout }}
+          Actual (from interface): {{ ansible_facts.nebula1.ipv4.address | default('Could not determine') }}
+      when: interface_ip_check.rc != 0
+
     - name: ℹ️ Display Nebula Service Status (Success)
       ansible.builtin.debug:
-        msg: "✅ Nebula service verified: Running, listening on UDP 4242, interface nebula1 active"
+        msg: "✅ Nebula service verified: Running, listening on UDP 4242, interface nebula1 active with IP {{ nebula_node_ip_extracted.stdout }}"
 
-    - name: 📋 Display Generated Nebula Config (Lighthouse Section)
+    - name: 🔍 Check Nebula Logs for Critical Errors
       ansible.builtin.shell: |
+        journalctl -u nebula -n 50 --no-pager | grep -iE "(error|failed|fatal)" || true
+      changed_when: false
+      register: nebula_log_errors
+
+    - name: ⚠️ Display Nebula Log Errors (if any)
+      ansible.builtin.debug:
+        msg: "{{ nebula_log_errors.stdout_lines }}"
+      when: nebula_log_errors.stdout != ""
+
+    - name: 🔍 Verify Systemd Service File
+      ansible.builtin.stat:
+        path: /etc/systemd/system/nebula.service
+      register: systemd_service_file
+      failed_when: not systemd_service_file.stat.exists
+
+    - name: 📋 Display Generated Nebula Config (Key Sections)
+      ansible.builtin.shell: |
+        echo "=== Certificate Info ==="
+        /usr/bin/nebula-cert print -path /etc/nebula/host.crt | grep -E "(Name|IP)"
+        echo ""
         echo "=== Lighthouse Configuration ==="
         grep -A 5 "^lighthouse:" /etc/nebula/config.yaml || echo "No lighthouse section found!"
         echo ""
         echo "=== Static Host Map ==="
-        grep -A 5 "^static_host_map:" /etc/nebula/config.yaml || echo "No static_host_map found!"
+        grep -A 3 "^static_host_map:" /etc/nebula/config.yaml || echo "No static_host_map found!"
         echo ""
         echo "=== Punch Configuration ==="
-        grep "^punchy:" /etc/nebula/config.yaml || echo "No punchy found!"
-        grep "^punch_back:" /etc/nebula/config.yaml || echo "No punch_back found!"
+        grep -A 2 "^punchy:" /etc/nebula/config.yaml || echo "No punchy found!"
       register: nebula_config_debug
       changed_when: false
 
@@ -434,14 +597,14 @@
 
     - name: 🔍 Test Nebula Connectivity to Lighthouse
       ansible.builtin.command:
-        cmd: ping -c 3 -W 5 10.42.0.1
+        cmd: ping -c 3 -W 5 10.100.0.1
       register: lighthouse_ping
       failed_when: lighthouse_ping.rc != 0
       changed_when: false
 
     - name: ✅ Lighthouse Connectivity
       debug:
-        msg: "✓ Nebula mesh connectivity to Lighthouse (10.42.0.1) verified"
+        msg: "✓ Nebula mesh connectivity to Lighthouse (10.100.0.1) verified"
       when: lighthouse_ping.rc == 0
 
     - name: 🔍 Test Nebula Connectivity Between Nodes (Control Plane Only)

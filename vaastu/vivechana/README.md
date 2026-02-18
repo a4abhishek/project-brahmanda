@@ -14,7 +14,8 @@ This directory holds the **Nidaan** (निदान) documents, which are the R
 | [RCA-008](./RCA-008-Brahmaloka-Connection-Refused.md) | Brahmaloka | IP Conflict & Resource Exhaustion | Resolved |
 | [RCA-009](./RCA-009-Virtual-Disk-Provisioning-Mismatch.md) | Vyom | Proxmox Disk Interface Mismatch | Resolved |
 | [RCA-010](./RCA-010-Kshitiz-SSH-Lockout.md) | Kshitiz | SSH Hardening (UsePAM) Lockout | Resolved |
-| [RCA-011](./RCA-011-Ansible-Variable-Scoping-and-HostVars.md) | Vyom | HostVar Scoping & Search Path Failures | Resolved |
+| [RCA-011](./RCA-011-Ansible-HostVar-Scope-Failure.md) | Vyom | HostVar Scoping & Search Path Failures | Resolved |
+| [RCA-012](./RCA-012-Nebula-Mesh-Connectivity-Failure.md) | Vyom | Nebula Mesh Connectivity Failure | Resolved |
 
 ---
 
