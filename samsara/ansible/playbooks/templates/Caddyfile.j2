@@ -3,20 +3,22 @@
   email {{ acme_email }}
 }
 
-# Wildcard for infrastructure services
-*.brahmanda.{{ domain_name }} {
-  reverse_proxy https://10.100.1.210:443 {
-    transport http {
-      tls_insecure_skip_verify
-    }
-  }
+# NOTE: Wildcard certs (*.brahmanda.* or *.domain.*) require DNS-01 ACME challenge,
+# which needs a DNS provider API integration. Using explicit hostnames here enables
+# standard HTTP-01 challenge with the out-of-the-box Caddy apt package.
+# To enable wildcards in future: build xcaddy with caddy-dns/hostinger and add
+# a hostinger_api_token to the vault.
+
+# --- Infrastructure Services (brahmanda.* namespace) ---
+# Add a new line here when deploying a new infra service (ArgoCD, Grafana, etc.)
+argocd.brahmanda.{{ domain_name }} {
+  # ADR-008: Caddy terminates public TLS, then forwards plain HTTP over Nebula mesh.
+  # Nebula (Noise Protocol) encrypts the Kshitiz→Vyom tunnel, so HTTP is safe here.
+  reverse_proxy http://10.100.1.210:80
 }
 
-# Root domain and wildcard for apps
-{{ domain_name }}, *.{{ domain_name }} {
-  reverse_proxy https://10.100.1.210:443 {
-    transport http {
-      tls_insecure_skip_verify
-    }
-  }
+# --- Public / Vanity Services ---
+# Add new app subdomains here (e.g. games.{{ domain_name }}, blog.{{ domain_name }})
+{{ domain_name }}, www.{{ domain_name }} {
+  reverse_proxy http://10.100.1.210:80
 }

@@ -174,7 +174,15 @@ resource "aws_lightsail_instance_public_ports" "firewall" {
     cidrs     = ["0.0.0.0/0"] # Lighthouse needs to be accessible globally
   }
 
-  # HTTPS for future web services (optional)
+  # HTTP - Required for Caddy ACME HTTP-01 challenges and HTTP→HTTPS redirects
+  port_info {
+    protocol  = "tcp"
+    from_port = 80
+    to_port   = 80
+    cidrs     = ["0.0.0.0/0"]
+  }
+
+  # HTTPS for web services
   port_info {
     protocol  = "tcp"
     from_port = 443

@@ -75,8 +75,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: oci://ghcr.io/a4abhishek
-    chart: portfolio
+    repoURL: ghcr.io
+    chart: a4abhishek/charts/portfolio
     targetRevision: 1.0.0
     helm:
       releaseName: portfolio
@@ -100,7 +100,9 @@ git commit -m "feat: Add portfolio application sutra"
 git push origin main
 ```
 
-> **💡 NOTE:** The ArgoCD Application uses `repoURL: oci://ghcr.io/a4abhishek` (not `oci://ghcr.io/a4abhishek/portfolio`). This is because OCI Helm charts are stored at the **organization/user level** in GHCR, not repository level. The `chart: portfolio` field specifies which chart to pull.
+> **💡 NOTE:** The Helm chart is published under a **dedicated `charts/` sub-path** (`oci://ghcr.io/a4abhishek/charts`) to avoid a tag collision with the Docker image. Both the Docker image and the Helm chart would share `ghcr.io/a4abhishek/portfolio:0.1.0` if pushed to the same location — the Helm push runs after the Docker build in the workflow, and would silently overwrite the Docker image OCI manifest with a Helm chart artifact. Kubernetes would then pull the Helm chart instead of a container image, causing `CreateContainerError: no command specified`. Keeping charts under `ghcr.io/a4abhishek/charts/portfolio:*` eliminates the collision.
+>
+> The ArgoCD Application uses `repoURL: ghcr.io` (the bare registry host, no scheme) so that it matches the `url: ghcr.io` in the `ghcr-oci-helm-registry` repository secret exactly. The full OCI chart path (`a4abhishek/charts/portfolio`) lives in the `chart` field. ArgoCD passes `repoURL` to `git.SameURL()` when looking up credentials, then forwards both fields to the Helm SDK which constructs the full pull URL as `oci://ghcr.io/a4abhishek/charts/portfolio`.
 
 ---
 
@@ -487,7 +489,7 @@ jobs:
           fi
 
           helm package helm/
-          helm push portfolio-*.tgz oci://${{ env.REGISTRY }}/${{ github.repository_owner }}
+          helm push portfolio-*.tgz oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts
 EOF
 ```
 
@@ -656,7 +658,7 @@ op read "op://Project-Brahmanda/ArgoCD-Admin-Password/password"
 
 Once DNS is configured and cert-manager is operational (Phase 3+), access:
 
-- **ArgoCD UI:** <https://argocd.vyom.abhishek-kashyap.com>
+- **ArgoCD UI:** <https://argocd.brahmanda.abhishek-kashyap.com>
 - **Portfolio:** <https://abhishek-kashyap.com>
 
 ---
@@ -762,8 +764,8 @@ After bootstrap, deploying new applications is simple:
    spec:
      project: default
      source:
-       repoURL: oci://ghcr.io/a4abhishek
-       chart: my-new-app
+       repoURL: ghcr.io
+       chart: a4abhishek/charts/my-new-app
        targetRevision: 1.0.0
      destination:
        server: https://kubernetes.default.svc

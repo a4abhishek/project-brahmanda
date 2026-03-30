@@ -4,8 +4,9 @@
 ---
 
 # ArgoCD Configuration
-argocd_namespace: "argocd"
 argocd_version: "v3.3.0"  # Latest stable (breaking changes only affect upgrades/self-management, not fresh installs)
+argocd_namespace: "argocd"
+apps_namespace: "apps"
 
 # ArgoCD Image Updater Configuration
 argocd_image_updater_version: "v1.1.0"  # First major release! (Released 2026-02-05)

@@ -1,3 +1,8 @@
+# samsara/ansible/group_vars/vyom/vars.yml
+#
+# Non-secret variables for the Vyom K3s cluster group.
+# ─────────────────────────────────────────────────────
+
 # 1. Cluster Identity
 k3s_cluster_state: installed
 k3s_version: v1.35.0+k3s1      # Pin k3s version
@@ -9,6 +14,34 @@ k3s_flannel_iface: "eth0"                          # Default interface for Vyom 
 # My first goal is Education second is Uptime, so I will keep it simple as off now.
 # Later when I add more masters, I will learn to migrate to etcd while having a Disaster Recovery plan.
 k3s_etcd_datastore: false
+
+# 3. NetworkPolicy Enforcement
+#
+# ⚠️  SECURITY GAP: K3s with the default Flannel CNI does NOT enforce
+# Kubernetes NetworkPolicies. NetworkPolicy manifests can be applied (and are,
+# via 04-bootstrap-maya.yml) but they have no effect until a NetworkPolicy
+# controller is deployed.
+#
+# Current state: NetworkPolicy declared, NOT enforced.
+#
+# Upgrade path (pick one):
+#   Option A — Calico CNI (recommended, full-featured):
+#     Rebuild cluster with:
+#       k3s_server:
+#         flannel-backend: none
+#         disable-network-policy: true
+#     Then deploy Calico via ArgoCD application.
+#
+#   Option B — Cilium CNI (eBPF-based, better observability):
+#     Same approach as Calico but deploy Cilium instead.
+#
+#   Option C — kube-router policy-only (lightest-weight, no rebuild):
+#     Deploy kube-router DaemonSet with --run-router=false
+#     --run-service-proxy=false --run-firewall=true alongside existing Flannel.
+#     Requires pinned version and RBAC manifests.
+#
+# Note: This is a homelab with no multi-tenant workloads. All deployed pods
+# are trusted. Risk of lateral movement to ArgoCD is low but not zero.
 
 # [This will be configured via the ansible Playbook]
 # # 4. Sanitation

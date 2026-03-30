@@ -59,27 +59,30 @@
   # Phase 1: Install ArgoCD
   # ---------------------------------------------------------------------------
   tasks:
-    - name: � Install apache2-utils (for htpasswd)
+    - name: 🔧 Install apache2-utils (for htpasswd)
       ansible.builtin.apt:
         name: apache2-utils
         state: present
         update_cache: true
 
-    - name: �📂 Create ArgoCD Namespace
+    - name: 📂 Create Namespaces
       ansible.builtin.shell: |
         set -euo pipefail
-        kubectl create namespace {{ argocd_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace {{ item }} --dry-run=client -o yaml | kubectl apply -f -
       args:
         executable: /bin/bash
       environment:
         KUBECONFIG: "{{ kubeconfig_path }}"
+      loop:
+        - "{{ argocd_namespace }}"
+        - "{{ apps_namespace }}"
       changed_when: false
 
     - name: 📥 Download ArgoCD Installation Manifest
       ansible.builtin.get_url:
         url: "https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/install.yaml"
         dest: "/tmp/argocd-install.yaml"
-        mode: '0644'
+        mode: "0644"
 
     - name: ☸️ Install ArgoCD (Server-Side Apply for Large CRDs)
       ansible.builtin.command:
@@ -111,6 +114,62 @@
         KUBECONFIG: "{{ kubeconfig_path }}"
       changed_when: false
 
+    - name: 🔧 Configure ArgoCD Server in Insecure Mode (HTTP over Nebula)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        # ADR-008: Caddy terminates TLS at the edge; traffic over Nebula is HTTP.
+        # ArgoCD must serve HTTP on port 80 (insecure mode) so Traefik can proxy it.
+        # This is the official ArgoCD-recommended configuration for all ingress
+        # controllers that terminate TLS externally (Traefik, nginx, Contour, ALB...).
+        # Internal ArgoCD component TLS (server↔repo-server↔app-controller) is
+        # maintained regardless of this flag. Auth (JWT) is still required.
+        kubectl patch configmap argocd-cmd-params-cm \
+          -n {{ argocd_namespace }} \
+          --type merge \
+          -p '{"data":{"server.insecure":"true"}}'
+        kubectl rollout restart deployment/argocd-server -n {{ argocd_namespace }}
+        kubectl rollout status deployment/argocd-server -n {{ argocd_namespace }} --timeout=120s
+      args:
+        executable: /bin/bash
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: true
+
+    - name: 🔒 Disable Anonymous Access in ArgoCD (Explicit Hardening)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        # ArgoCD defaults anonymous access to false, but we set it explicitly
+        # to survive any future ConfigMap reset or upstream install.yaml changes.
+        # Security reference: https://argo-cd.readthedocs.io/en/stable/operator-manual/security/
+        kubectl patch configmap argocd-cm \
+          -n {{ argocd_namespace }} \
+          --type merge \
+          -p '{"data":{"users.anonymous.enabled":"false"}}'
+      args:
+        executable: /bin/bash
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: true
+
+    - name: 📜 Create ArgoCD NetworkPolicy Manifest
+      ansible.builtin.template:
+        src: argocd-network-policy.yaml.j2
+        dest: "/tmp/argocd-network-policy.yaml"
+        mode: "0644"
+
+    - name: 🛡️ Deploy ArgoCD NetworkPolicy (Restrict HTTP to Traefik)
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/argocd-network-policy.yaml
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: argocd_netpol
+      changed_when: "'created' in argocd_netpol.stdout or 'configured' in argocd_netpol.stdout"
+      # NOTE: This NetworkPolicy is declared but only enforced if a NetworkPolicy
+      # controller is present. K3s + Flannel (default) does NOT enforce
+      # NetworkPolicies. Upgrade path: switch CNI to Calico or Cilium (see
+      # group_vars/vyom/vars.yml for context), or deploy kube-router policy-only
+      # DaemonSet alongside Flannel.
+
     - name: 🔑 Update ArgoCD Admin Password
       ansible.builtin.shell: |
         set -euo pipefail
@@ -131,7 +190,7 @@
       ansible.builtin.template:
         src: argocd-ingress.yaml.j2
         dest: "/tmp/argocd-ingress.yaml"
-        mode: '0644'
+        mode: "0644"
 
     - name: 🌐 Deploy ArgoCD Ingress
       ansible.builtin.command:
@@ -148,7 +207,7 @@
       ansible.builtin.get_url:
         url: "https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/refs/tags/{{ argocd_image_updater_version }}/config/install.yaml"
         dest: "/tmp/argocd-image-updater-install.yaml"
-        mode: '0644'
+        mode: "0644"
 
     - name: ☸️ Install ArgoCD Image Updater
       ansible.builtin.command:
@@ -169,10 +228,13 @@
           --docker-username="{{ ghcr_username | trim }}" \
           --docker-password="{{ ghcr_password | trim }}" \
           --docker-email="{{ github_username | trim }}@users.noreply.github.com" \
-          --namespace={{ argocd_namespace }} \
+          --namespace={{ item }} \
           --dry-run=client -o yaml | kubectl apply -f -
       environment:
         KUBECONFIG: "{{ kubeconfig_path }}"
+      loop:
+        - "{{ argocd_namespace }}"
+        - "{{ apps_namespace }}"
       no_log: true
       changed_when: false
       args:
@@ -205,14 +267,50 @@
       args:
         executable: /bin/bash
 
+    - name: 🔐 Create GHCR OCI Helm Registry Credential Manifest
+      ansible.builtin.template:
+        src: ghcr-oci-helm-registry.yaml.j2
+        dest: /tmp/ghcr-oci-helm-registry.yaml
+        mode: "0600"
+      no_log: true
+
+    - name: 🔐 Register GHCR OCI Helm Registry Credentials in ArgoCD
+      ansible.builtin.shell: |
+        set -euo pipefail
+        kubectl apply -f /tmp/ghcr-oci-helm-registry.yaml
+        rm -f /tmp/ghcr-oci-helm-registry.yaml
+      args:
+        executable: /bin/bash
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: true
+
     # -------------------------------------------------------------------------
     # Phase 4: Deploy Bootstrap Application
     # -------------------------------------------------------------------------
+    - name: 🔐 Create brahmanda-sutra Repository Credential Manifest
+      ansible.builtin.template:
+        src: brahmanda-sutra-repo.yaml.j2
+        dest: /tmp/brahmanda-sutra-repo.yaml
+        mode: "0600"
+      no_log: true
+
+    - name: 🔐 Register brahmanda-sutra Git Repository Credentials in ArgoCD
+      ansible.builtin.shell: |
+        set -euo pipefail
+        kubectl apply -f /tmp/brahmanda-sutra-repo.yaml
+        rm -f /tmp/brahmanda-sutra-repo.yaml
+      args:
+        executable: /bin/bash
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: true
+
     - name: 📜 Create Bootstrap Application Manifest
       ansible.builtin.template:
         src: bootstrap-application.yaml.j2
         dest: "/tmp/bootstrap-application.yaml"
-        mode: '0644'
+        mode: "0644"
 
     - name: ☸️ Deploy Bootstrap Application
       ansible.builtin.command:

@@ -1,0 +1,21 @@
+---
+# ArgoCD repository credential for pulling OCI Helm charts from GHCR.
+# Key: secret-type=repository with url=ghcr.io (no scheme, no path).
+# ArgoCD resolves credentials for Helm OCI sources by doing git.SameURL()
+# on the Application's repoURL vs the secret's url field. Both must be
+# the bare registry host (ghcr.io) so the comparison is equal. The oci://
+# scheme and chart path live in the Application spec, not here.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ghcr-oci-helm-registry
+  namespace: {{ argocd_namespace }}
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: helm
+  name: ghcr
+  url: ghcr.io
+  enableOCI: "true"
+  username: {{ ghcr_username | trim }}
+  password: {{ ghcr_password | trim }}

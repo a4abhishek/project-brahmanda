@@ -1,0 +1,18 @@
+---
+# ArgoCD repository credential for cloning the brahmanda-sutra private GitHub
+# repo. Without this, ArgoCD reports "authentication required: Repository not
+# found" for private repos. The PAT needs at least repo:read scope.
+# The label argocd.argoproj.io/secret-type=repository causes ArgoCD to pick
+# this up automatically.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: brahmanda-sutra-repo
+  namespace: {{ argocd_namespace }}
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: git
+  url: {{ brahmanda_sutra_repo }}
+  username: {{ github_username | trim }}
+  password: {{ github_argocd_image_updater_pat | trim }}

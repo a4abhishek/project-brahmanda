@@ -1,0 +1,54 @@
+---
+# argocd-network-policy.yaml.j2
+#
+# Restricts ingress to the ArgoCD server pod:
+#   - ALLOW: Traefik (kube-system namespace) → ArgoCD port 8080
+#   - ALLOW: All ArgoCD internal components (same namespace, any port)
+#   - DENY:  All other pods cluster-wide
+#
+# ADR-008 context: ArgoCD runs in insecure mode (HTTP). TLS is terminated by
+# Caddy at the Kshitiz edge, and Nebula (Noise Protocol) encrypts the
+# Kshitiz→Vyom segment. Within the cluster, only Traefik should reach ArgoCD.
+# Authentication (JWT) is still required for all ArgoCD API calls regardless.
+#
+# ⚠️  ENFORCEMENT REQUIREMENT:
+# K3s with the default Flannel CNI does NOT enforce NetworkPolicies.
+# This manifest declares correct intent and is ready to enforce immediately
+# once a NetworkPolicy controller is in place. Options:
+#   - Calico CNI (replace Flannel): recommended production path
+#   - Cilium CNI (replace Flannel): recommended if you want eBPF observability
+#   - kube-router (policy-only DaemonSet alongside Flannel): lightest-weight option
+# See: https://docs.k3s.io/networking/basic-network-options
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-server-restrict-to-traefik
+  namespace: {{ argocd_namespace }}
+  annotations:
+    brahmanda.io/adr: "ADR-008"
+    brahmanda.io/purpose: "Restrict ArgoCD HTTP endpoint to Traefik ingress controller only"
+spec:
+  # Targets only the ArgoCD server pod (the sole externally-reachable component)
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-server
+  policyTypes:
+    - Ingress
+  ingress:
+    # Rule 1: Allow Traefik (K3s default, namespace: kube-system) to reach
+    # ArgoCD on its HTTP port. ArgoCD container listens on 8080; the K8s
+    # Service maps port 80 → targetPort 8080.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Rule 2: Allow all pods within the argocd namespace to communicate freely.
+    # Covers: argocd-application-controller, argocd-repo-server, argocd-dex-server,
+    #         argocd-redis, argocd-image-updater, argocd-notifications-controller.
+    - from:
+        - podSelector: {}
