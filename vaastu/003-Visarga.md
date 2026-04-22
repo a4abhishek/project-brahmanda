@@ -71,7 +71,8 @@ metadata:
     argocd-image-updater.argoproj.io/portfolio.update-strategy: semver
     argocd-image-updater.argoproj.io/portfolio.helm.image-name: image.repository
     argocd-image-updater.argoproj.io/portfolio.helm.image-tag: image.tag
-    argocd-image-updater.argoproj.io/write-back-method: git
+    argocd-image-updater.argoproj.io/portfolio.pull-secret: pullsecret:argocd/ghcr-secret
+    argocd-image-updater.argoproj.io/write-back-method: argocd
 spec:
   project: default
   source:
@@ -92,17 +93,38 @@ spec:
 EOF
 ```
 
-### **Step 3: Commit and Push**
+### **Step 3: Create ImageUpdater CR**
+
+ArgoCD Image Updater v1.1.0+ uses a CRD-based control loop — it no longer scans `Application` annotations automatically. This CR tells the controller to read image update configuration from the `portfolio` Application's annotations.
+
+```bash
+cat > apps/portfolio-image-updater.yaml <<'EOF'
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: portfolio
+  namespace: argocd
+spec:
+  namespace: argocd
+  applicationRefs:
+    - namePattern: portfolio
+      useAnnotations: true    # read image config from Application's annotations
+EOF
+```
+
+### **Step 4: Commit and Push**
 
 ```bash
 git add .
-git commit -m "feat: Add portfolio application sutra"
+git commit -m "feat: Add portfolio application sutra and image updater CR"
 git push origin main
 ```
 
 > **💡 NOTE:** The Helm chart is published under a **dedicated `charts/` sub-path** (`oci://ghcr.io/a4abhishek/charts`) to avoid a tag collision with the Docker image. Both the Docker image and the Helm chart would share `ghcr.io/a4abhishek/portfolio:0.1.0` if pushed to the same location — the Helm push runs after the Docker build in the workflow, and would silently overwrite the Docker image OCI manifest with a Helm chart artifact. Kubernetes would then pull the Helm chart instead of a container image, causing `CreateContainerError: no command specified`. Keeping charts under `ghcr.io/a4abhishek/charts/portfolio:*` eliminates the collision.
 >
 > The ArgoCD Application uses `repoURL: ghcr.io` (the bare registry host, no scheme) so that it matches the `url: ghcr.io` in the `ghcr-oci-helm-registry` repository secret exactly. The full OCI chart path (`a4abhishek/charts/portfolio`) lives in the `chart` field. ArgoCD passes `repoURL` to `git.SameURL()` when looking up credentials, then forwards both fields to the Helm SDK which constructs the full pull URL as `oci://ghcr.io/a4abhishek/charts/portfolio`.
+>
+> **⚠️ argocd-image-updater v1.1.0+:** The controller no longer scans `Application` annotations automatically. It only processes `ImageUpdater` CRs (`imageupdaters.argocd-image-updater.argoproj.io`). A running controller with no `ImageUpdater` CRs logs `"No ImageUpdater CRs to process"` every cycle and does nothing — even with correctly-annotated Applications. The `portfolio-image-updater.yaml` created in Step 3 is the required activation switch. See [RCA-014](./vivechana/RCA-014-ArgoCD-Image-Updater-V1-Breaking-Change.md) for the full incident.
 
 ---
 

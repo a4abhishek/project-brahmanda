@@ -24,3 +24,12 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+  # Prevent selfHeal from reverting ArgoCD Image Updater patches on managed Applications.
+  # Image Updater uses write-back-method: argocd which directly patches spec.source.helm.parameters;
+  # without this, brahmanda-sutra would immediately revert those changes.
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      jqPathExpressions:
+        - .spec.source.helm.parameters
+        - .spec.sources[].helm.parameters
