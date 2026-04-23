@@ -1,0 +1,11 @@
+data:
+  resource.customizations.health.networking.k8s.io_Ingress: |
+    hs = {}
+    if obj.spec ~= nil and obj.spec.rules ~= nil and #obj.spec.rules > 0 then
+      hs.status = "Healthy"
+      hs.message = "Ingress rules configured"
+    else
+      hs.status = "Progressing"
+      hs.message = "No ingress rules defined"
+    end
+    return hs
