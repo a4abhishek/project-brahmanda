@@ -972,6 +972,16 @@ sequenceDiagram
 - ✅ Portfolio application configured with update annotations
 - ✅ Automatic PR creation validated (publish new portfolio version, wait for PR)
 
+> **📌 Phase 2 Implementation Note — Git Write-Back for OCI Helm Source:**
+>
+> The current Phase 1 setup uses `writeBackConfig.method: argocd` (Image Updater patches the Application spec directly in-cluster). This works but has a **cluster recreate problem**: after a full `make pralaya` + `make srishti`, the Application starts at the hardcoded `targetRevision` in git, then Image Updater patches it back to the latest — a 2-minute gap where the old version is running.
+>
+> Phase 2 must replace this with `method: git`. Because the Application source is OCI Helm (not a git repo), a **multi-source Application** is required:
+> - **Source 1:** OCI Helm chart at `ghcr.io` (current)
+> - **Source 2:** A git path in `brahmanda-sutra` (e.g., `apps/params/portfolio/`) where Image Updater writes a `values.yaml` override file. ArgoCD merges it onto Source 1 via `helm.valueFiles`.
+>
+> This restores full Asanga Shastra compliance: `brahmanda-sutra` always reflects the latest deployed version, and a fresh cluster converges in one sync with no intermediate wrong-version state.
+
 ---
 
 ## **Phase 3: Security Hardening (Chakravyuh Defense)**

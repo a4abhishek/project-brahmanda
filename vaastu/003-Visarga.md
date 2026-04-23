@@ -66,13 +66,6 @@ kind: Application
 metadata:
   name: portfolio
   namespace: argocd
-  annotations:
-    argocd-image-updater.argoproj.io/image-list: portfolio=ghcr.io/a4abhishek/portfolio
-    argocd-image-updater.argoproj.io/portfolio.update-strategy: semver
-    argocd-image-updater.argoproj.io/portfolio.helm.image-name: image.repository
-    argocd-image-updater.argoproj.io/portfolio.helm.image-tag: image.tag
-    argocd-image-updater.argoproj.io/portfolio.pull-secret: pullsecret:argocd/ghcr-secret
-    argocd-image-updater.argoproj.io/write-back-method: argocd
 spec:
   project: default
   source:
@@ -95,7 +88,7 @@ EOF
 
 ### **Step 3: Create ImageUpdater CR**
 
-ArgoCD Image Updater v1.1.0+ uses a CRD-based control loop — it no longer scans `Application` annotations automatically. This CR tells the controller to read image update configuration from the `portfolio` Application's annotations.
+ArgoCD Image Updater v1.1.0+ uses a CRD-based control loop — image update configuration lives in an `ImageUpdater` CR, not in `Application` annotations. The `Application` manifest above stays clean; all image tracking config is here:
 
 ```bash
 cat > apps/portfolio-image-updater.yaml <<'EOF'
@@ -106,9 +99,20 @@ metadata:
   namespace: argocd
 spec:
   namespace: argocd
+  writeBackConfig:
+    method: argocd         # patch Application spec directly via ArgoCD API; no git commit needed
   applicationRefs:
     - namePattern: portfolio
-      useAnnotations: true    # read image config from Application's annotations
+      commonUpdateSettings:
+        pullSecret: pullsecret:argocd/ghcr-secret
+        updateStrategy: semver
+      images:
+        - alias: portfolio
+          imageName: ghcr.io/a4abhishek/portfolio
+          manifestTargets:
+            helm:
+              name: image.repository
+              tag: image.tag
 EOF
 ```
 
@@ -124,7 +128,7 @@ git push origin main
 >
 > The ArgoCD Application uses `repoURL: ghcr.io` (the bare registry host, no scheme) so that it matches the `url: ghcr.io` in the `ghcr-oci-helm-registry` repository secret exactly. The full OCI chart path (`a4abhishek/charts/portfolio`) lives in the `chart` field. ArgoCD passes `repoURL` to `git.SameURL()` when looking up credentials, then forwards both fields to the Helm SDK which constructs the full pull URL as `oci://ghcr.io/a4abhishek/charts/portfolio`.
 >
-> **⚠️ argocd-image-updater v1.1.0+:** The controller no longer scans `Application` annotations automatically. It only processes `ImageUpdater` CRs (`imageupdaters.argocd-image-updater.argoproj.io`). A running controller with no `ImageUpdater` CRs logs `"No ImageUpdater CRs to process"` every cycle and does nothing — even with correctly-annotated Applications. The `portfolio-image-updater.yaml` created in Step 3 is the required activation switch. See [RCA-014](./vivechana/RCA-014-ArgoCD-Image-Updater-V1-Breaking-Change.md) for the full incident.
+> **argocd-image-updater v1.1.0+:** All image tracking configuration lives in the `ImageUpdater` CR, not in `Application` annotations. The `Application` manifest is intentionally annotation-free. The `ImageUpdater` CR selects the Application by `namePattern`, specifies the registry credentials, update strategy, and Helm value paths. See [RCA-014](./vivechana/RCA-014-ArgoCD-Image-Updater-V1-Breaking-Change.md) for the incident that surfaced this design.
 
 ---
 
@@ -736,9 +740,10 @@ You have completed **Phase 1** of Visarga — your first application lives in th
 
 **Subsequent Phases (see [ADR-009](./vidhana/ADR-009-Visarga-Deployment-Architecture.md)):**
 
-- **Phase 2:** Automated version updates via ArgoCD Image Updater
-  - *Why:* Eliminate manual manifest updates when new image versions are published
-  - *When:* After you've deployed 2-3 applications and manual updates become tedious
+- **Phase 2:** Git write-back for Image Updater
+  - *Why:* `method: argocd` keeps your running application fully up-to-date — Image Updater automatically patches the deployed version whenever a new tag is published. The only gap is that `brahmanda-sutra` git itself doesn't reflect the latest `targetRevision`. In practice this means a recreated cluster briefly starts on the git-pinned version before Image Updater re-converges (~2 minutes). Phase 2 closes this gap by committing updates back to git.
+  - *Interim:* No immediate action required — Phase 1 handles live updates. As a good habit, **periodically update `targetRevision` in `apps/portfolio.yaml`** (e.g., when you do a planned cluster maintenance or notice the git pin is many versions behind). This is optional hygiene, not urgent.
+  - *How:* Multi-source Application (OCI Helm + git params path). See [ADR-009 Phase 2 note](./vidhana/ADR-009-Visarga-Deployment-Architecture.md#phase-2-deliverable-checklist).
 
 - **Phase 3:** Production-grade security (Sealed Secrets, Network Policies)
   - *Why:* Store encrypted secrets in Git, isolate application traffic

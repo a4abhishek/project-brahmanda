@@ -52,7 +52,9 @@ The `argocd_image_updater_version: "v1.1.0"` variable was set in `group_vars/may
 
 ## 5. Resolution
 
-**Created** `brahmanda-sutra/apps/portfolio-image-updater.yaml`:
+**Initial fix:** Created `portfolio-image-updater.yaml` with `useAnnotations: true` as a backward-compat bridge to unblock the deployment immediately.
+
+**Final fix:** Migrated to the native v1.1.0 CRD API. All image update configuration removed from `portfolio.yaml` annotations and expressed natively in the `ImageUpdater` CR:
 
 ```yaml
 apiVersion: argocd-image-updater.argoproj.io/v1alpha1
@@ -61,13 +63,24 @@ metadata:
   name: portfolio
   namespace: argocd
 spec:
-  namespace: argocd           # namespace where the target Application lives
+  namespace: argocd
+  writeBackConfig:
+    method: argocd         # patch Application spec directly; no git commit needed
   applicationRefs:
     - namePattern: portfolio
-      useAnnotations: true    # backward-compat: read config from Application annotations
+      commonUpdateSettings:
+        pullSecret: pullsecret:argocd/ghcr-secret
+        updateStrategy: semver
+      images:
+        - alias: portfolio
+          imageName: ghcr.io/a4abhishek/portfolio
+          manifestTargets:
+            helm:
+              name: image.repository
+              tag: image.tag
 ```
 
-`useAnnotations: true` is the v1.1.0 bridge that makes the new CRD-based controller honour the existing `argocd-image-updater.argoproj.io/*` annotations on the `portfolio` Application without rewriting them into the CR body.
+The `Application` manifest is now annotation-free. The `ImageUpdater` CR is the single source of truth for image tracking configuration.
 
 ---
 
