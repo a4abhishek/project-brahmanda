@@ -1,0 +1,39 @@
+name: 💓 Upstash Heartbeat
+
+# Upstash free-tier Redis databases are deleted after 14 days of inactivity.
+# This workflow writes a heartbeat key and immediately deletes it once a week
+# to keep the database active indefinitely.
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 09:00 UTC
+  workflow_dispatch:      # Allow manual trigger
+
+jobs:
+  heartbeat:
+    name: Ping Upstash Redis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🔑 Load Upstash Credentials from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          UPSTASH_REDIS_REST_URL: op://Project-Brahmanda/Upstash-Sanchay-Token/UPSTASH_REDIS_REST_URL
+          UPSTASH_REDIS_REST_TOKEN: op://Project-Brahmanda/Upstash-Sanchay-Token/UPSTASH_REDIS_REST_TOKEN
+
+      - name: 💓 Write Heartbeat Key
+        run: |
+          response=$(curl -sf \
+            -H "Authorization: Bearer $UPSTASH_REDIS_REST_TOKEN" \
+            "$UPSTASH_REDIS_REST_URL/SET/brahmanda_heartbeat/$(date -u +%Y-%m-%dT%H:%M:%SZ)/EX/86400")
+          echo "SET response: $response"
+
+      - name: 🗑️ Delete Heartbeat Key
+        run: |
+          response=$(curl -sf \
+            -H "Authorization: Bearer $UPSTASH_REDIS_REST_TOKEN" \
+            "$UPSTASH_REDIS_REST_URL/DEL/brahmanda_heartbeat")
+          echo "DEL response: $response"
