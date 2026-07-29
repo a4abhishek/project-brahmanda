@@ -28,7 +28,7 @@ jobs:
         run: |
           response=$(curl -sf \
             -H "Authorization: Bearer $UPSTASH_REDIS_REST_TOKEN" \
-            "$UPSTASH_REDIS_REST_URL/SET/brahmanda_heartbeat/$(date -u +%Y-%m-%dT%H:%M:%SZ)/EX/86400")
+            "$UPSTASH_REDIS_REST_URL/SET/brahmanda_heartbeat/$(date -u +%Y-%m-%dT%H:%M:%SZ)")
           echo "SET response: $response"
 
       - name: 🗑️ Delete Heartbeat Key
